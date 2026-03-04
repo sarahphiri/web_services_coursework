@@ -5,6 +5,13 @@ from app.scoring import inverse_minmax, minmax_norm, hidden_gem_score
 from app.db import get_db
 from app.models import Destination
 
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.exc import IntegrityError
+
+from app.auth import hash_password, verify_password, create_access_token
+from app.schemas import UserCreate, UserOut, TokenOut
+from app.models import User
+
 app = FastAPI(title="Travel Without Barriers API")
 
 
@@ -130,3 +137,33 @@ def get_recommendations(
     # Sort best-first
     results.sort(key=lambda x: x["barrier_score"], reverse=True)
     return results[:max(1, min(limit, 50))]
+
+@app.post("/auth/register", response_model=UserOut)
+def register_user(payload: UserCreate, db: Session = Depends(get_db)):
+    user = User(
+        email=payload.email.lower().strip(),
+        password_hash=hash_password(payload.password),
+    )
+    db.add(user)
+    try:
+        db.commit()
+        db.refresh(user)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Email already registered")
+
+    return user
+
+
+@app.post("/auth/login", response_model=TokenOut)
+def login_user(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
+    email = form_data.username.lower().strip()
+    user = db.query(User).filter(User.email == email).first()
+    if not user or not verify_password(form_data.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Incorrect email or password")
+
+    token = create_access_token(subject=user.email)
+    return {"access_token": token, "token_type": "bearer"}
