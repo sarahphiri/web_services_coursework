@@ -47,3 +47,43 @@ class WishlistOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class WishlistItemCreate(BaseModel):
+    destination_id: int
+    notes: Optional[str] = Field(default=None, max_length=1000)
+    priority: Optional[int] = Field(default=None, ge=0)
+
+
+class WishlistItemUpdate(BaseModel):
+    notes: Optional[str] = Field(default=None, max_length=1000)
+    priority: Optional[int] = Field(default=None, ge=0)
+
+
+class DestinationOut(BaseModel):
+    id: int
+    name: str
+    country: str
+    continent: Optional[str] = None
+    type: Optional[str] = None
+    best_season: Optional[str] = None
+    avg_cost_usd: Optional[float] = None
+    rating: Optional[float] = None
+    annual_visitors_m: Optional[float] = None
+    unesco: Optional[bool] = None
+
+    class Config:
+        from_attributes = True
+
+
+class WishlistItemOut(BaseModel):
+    id: int
+    wishlist_id: int
+    destination_id: int
+    notes: Optional[str]
+    priority: Optional[int]
+    created_at: datetime
+    destination: DestinationOut
+
+    class Config:
+        from_attributes = True

@@ -16,6 +16,11 @@ from app.deps import get_current_user
 from app.models import Wishlist, User
 from app.schemas import WishlistCreate, WishlistUpdate, WishlistOut
 
+from sqlalchemy.exc import IntegrityError
+
+from app.models import WishlistItem, Wishlist, Destination
+from app.schemas import WishlistItemCreate, WishlistItemUpdate, WishlistItemOut
+
 app = FastAPI(title="Travel Without Barriers API")
 
 
@@ -261,3 +266,114 @@ def delete_wishlist(
     db.delete(wishlist)
     db.commit()
     return {"message": "Wishlist deleted"}
+
+
+def _get_owned_wishlist(db: Session, wishlist_id: int, user_id: int) -> Wishlist:
+    wishlist = (
+        db.query(Wishlist)
+        .filter(Wishlist.id == wishlist_id, Wishlist.user_id == user_id)
+        .first()
+    )
+    if not wishlist:
+        raise HTTPException(status_code=404, detail="Wishlist not found")
+    return wishlist
+
+
+@app.post("/wishlists/{wishlist_id}/items", response_model=WishlistItemOut, status_code=201)
+def add_wishlist_item(
+    wishlist_id: int,
+    payload: WishlistItemCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _get_owned_wishlist(db, wishlist_id, current_user.id)
+
+    # Ensure destination exists
+    destination = db.query(Destination).filter(Destination.id == payload.destination_id).first()
+    if not destination:
+        raise HTTPException(status_code=404, detail="Destination not found")
+
+    item = WishlistItem(
+        wishlist_id=wishlist_id,
+        destination_id=payload.destination_id,
+        notes=payload.notes.strip() if payload.notes else None,
+        priority=payload.priority,
+    )
+
+    db.add(item)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        # most likely unique constraint: destination already in wishlist
+        raise HTTPException(status_code=409, detail="Destination already in wishlist")
+
+    db.refresh(item)
+    return item
+
+
+@app.get("/wishlists/{wishlist_id}/items", response_model=list[WishlistItemOut])
+def list_wishlist_items(
+    wishlist_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _get_owned_wishlist(db, wishlist_id, current_user.id)
+
+    items = (
+        db.query(WishlistItem)
+        .filter(WishlistItem.wishlist_id == wishlist_id)
+        .order_by(WishlistItem.created_at.desc())
+        .all()
+    )
+    return items
+
+
+@app.patch("/wishlists/{wishlist_id}/items/{item_id}", response_model=WishlistItemOut)
+def update_wishlist_item(
+    wishlist_id: int,
+    item_id: int,
+    payload: WishlistItemUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _get_owned_wishlist(db, wishlist_id, current_user.id)
+
+    item = (
+        db.query(WishlistItem)
+        .filter(WishlistItem.id == item_id, WishlistItem.wishlist_id == wishlist_id)
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Wishlist item not found")
+
+    if payload.notes is not None:
+        item.notes = payload.notes.strip() if payload.notes else None
+    if payload.priority is not None:
+        item.priority = payload.priority
+
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@app.delete("/wishlists/{wishlist_id}/items/{item_id}")
+def delete_wishlist_item(
+    wishlist_id: int,
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _get_owned_wishlist(db, wishlist_id, current_user.id)
+
+    item = (
+        db.query(WishlistItem)
+        .filter(WishlistItem.id == item_id, WishlistItem.wishlist_id == wishlist_id)
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Wishlist item not found")
+
+    db.delete(item)
+    db.commit()
+    return {"message": "Wishlist item deleted"}
