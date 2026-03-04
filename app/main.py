@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.scoring import inverse_minmax, minmax_norm, hidden_gem_score
@@ -21,8 +21,10 @@ from sqlalchemy.exc import IntegrityError
 from app.models import WishlistItem, Wishlist, Destination
 from app.schemas import WishlistItemCreate, WishlistItemUpdate, WishlistItemOut
 
-app = FastAPI(title="Travel Without Barriers API")
+from app.errors import install_error_handlers
 
+app = FastAPI(title="Travel Without Barriers API")
+install_error_handlers(app)
 
 @app.get("/")
 def root():
@@ -32,9 +34,9 @@ def root():
 # GET /destinations
 @app.get("/destinations")
 def get_destinations(
-    limit: int = 20,
-    offset: int = 0,
-    db: Session = Depends(get_db)
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
 ):
     destinations = db.query(Destination).offset(offset).limit(limit).all()
     return destinations
@@ -56,9 +58,9 @@ def get_destination(destination_id: int, db: Session = Depends(get_db)):
 #added for recommendations
 @app.get("/recommendations")
 def get_recommendations(
-    limit: int = 10,
-    budget: float | None = None,          # optional user budget
-    avoid_peak: bool = True,              # treat "best season" as peak pressure (barrier)
+    limit: int = Query(10, ge=1, le=50),
+    budget: float | None = Query(None, gt=0),
+    avoid_peak: bool = True,
     db: Session = Depends(get_db),
 ):
     destinations = db.query(Destination).all()
