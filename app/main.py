@@ -12,6 +12,10 @@ from app.auth import hash_password, verify_password, create_access_token
 from app.schemas import UserCreate, UserOut, TokenOut
 from app.models import User
 
+from app.deps import get_current_user
+from app.models import Wishlist, User
+from app.schemas import WishlistCreate, WishlistUpdate, WishlistOut
+
 app = FastAPI(title="Travel Without Barriers API")
 
 
@@ -167,3 +171,93 @@ def login_user(
 
     token = create_access_token(subject=user.email)
     return {"access_token": token, "token_type": "bearer"}
+
+
+@app.post("/wishlists", response_model=WishlistOut)
+def create_wishlist(
+    payload: WishlistCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    wishlist = Wishlist(
+        user_id=current_user.id,
+        name=payload.name.strip(),
+        description=payload.description.strip() if payload.description else None,
+    )
+    db.add(wishlist)
+    db.commit()
+    db.refresh(wishlist)
+    return wishlist
+
+
+@app.get("/wishlists", response_model=list[WishlistOut])
+def list_wishlists(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return (
+        db.query(Wishlist)
+        .filter(Wishlist.user_id == current_user.id)
+        .order_by(Wishlist.created_at.desc())
+        .all()
+    )
+
+
+@app.get("/wishlists/{wishlist_id}", response_model=WishlistOut)
+def get_wishlist(
+    wishlist_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    wishlist = (
+        db.query(Wishlist)
+        .filter(Wishlist.id == wishlist_id, Wishlist.user_id == current_user.id)
+        .first()
+    )
+    if not wishlist:
+        raise HTTPException(status_code=404, detail="Wishlist not found")
+    return wishlist
+
+
+@app.patch("/wishlists/{wishlist_id}", response_model=WishlistOut)
+def update_wishlist(
+    wishlist_id: int,
+    payload: WishlistUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    wishlist = (
+        db.query(Wishlist)
+        .filter(Wishlist.id == wishlist_id, Wishlist.user_id == current_user.id)
+        .first()
+    )
+    if not wishlist:
+        raise HTTPException(status_code=404, detail="Wishlist not found")
+
+    if payload.name is not None:
+        wishlist.name = payload.name.strip()
+    if payload.description is not None:
+        wishlist.description = payload.description.strip() if payload.description else None
+
+    db.commit()
+    db.refresh(wishlist)
+    return wishlist
+
+
+@app.delete("/wishlists/{wishlist_id}")
+def delete_wishlist(
+    wishlist_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    wishlist = (
+        db.query(Wishlist)
+        .filter(Wishlist.id == wishlist_id, Wishlist.user_id == current_user.id)
+        .first()
+    )
+    if not wishlist:
+        raise HTTPException(status_code=404, detail="Wishlist not found")
+
+    db.delete(wishlist)
+    db.commit()
+    return {"message": "Wishlist deleted"}

@@ -23,3 +23,27 @@ class UserOut(BaseModel):
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+from typing import Optional, List
+
+
+class WishlistCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    description: Optional[str] = Field(default=None, max_length=500)
+
+
+class WishlistUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    description: Optional[str] = Field(default=None, max_length=500)
+
+
+class WishlistOut(BaseModel):
+    id: int
+    user_id: int
+    name: str
+    description: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
