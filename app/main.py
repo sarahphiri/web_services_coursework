@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.scoring import inverse_minmax, minmax_norm, hidden_gem_score
 from app.db import get_db
@@ -34,13 +35,19 @@ def root():
 # GET /destinations
 @app.get("/destinations")
 def get_destinations(
-    limit: int = Query(20, ge=1, le=100),
+    limit: int | None = Query(None, ge=1),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    destinations = db.query(Destination).offset(offset).limit(limit).all()
-    return destinations
+    q = db.query(Destination).offset(offset)
+    if limit is not None:
+        q = q.limit(limit)
+    return q.all()
 
+@app.get("/destinations/count")
+def destinations_count(db: Session = Depends(get_db)):
+    total = db.query(func.count(Destination.id)).scalar()
+    return {"total": total}
 
 # GET /destinations/{id}
 @app.get("/destinations/{destination_id}")
