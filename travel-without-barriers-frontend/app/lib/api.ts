@@ -75,3 +75,45 @@ export async function createWishlist(
 
     return res.json();
 }
+
+export async function addDestinationToWishlist(
+    token: string,
+    wishlistId: number,
+    destinationId: number
+) {
+    const res = await fetch(`${API_BASE}/wishlists/${wishlistId}/items`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+            destination_id: destinationId,
+            notes: null,
+            priority: null,
+        }),
+    });
+
+    if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.detail || "Failed to add destination to wishlist");
+    }
+
+    return res.json();
+}
+
+export async function getWishlistItems(token: string, wishlistId: number) {
+    const res = await fetch(`${API_BASE}/wishlists/${wishlistId}/items`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+        cache: "no-store",
+    });
+
+    if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.detail || "Failed to fetch wishlist items");
+    }
+
+    return res.json();
+}
