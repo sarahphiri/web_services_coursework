@@ -1,11 +1,17 @@
+import Image from "next/image";
+
 export default function Navbar() {
   return (
     <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm">
       <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
         <a href="/" className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-teal-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
-            T
-          </div>
+          <Image
+            src="/TWB_Logo.png"
+            alt="TWB_Logo"
+            width={56}
+            height={56}
+            className="object-contain"
+          />
           <div>
             <p className="text-xl font-bold text-[#007788] leading-none">
               Travel
