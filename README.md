@@ -402,3 +402,9 @@ Potential future improvements include:
 MIT License
 
 EOF
+
+## API Documentation
+
+Full API documentation is available here:
+
+[API Documentation PDF](Travel_Without_Barriers_API_Documentation.pdf)
