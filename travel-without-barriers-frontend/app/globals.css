@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f9f9f9;
+  --foreground: #333333;
+  --teal: #00a896;
+  --deep-water: #007788;
+  --sunny: #ffd166;
+  --light-gray: #e0e0e0;
+  --card-bg: #ffffff;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: linear-gradient(to bottom, #f9f9f9, #eef7f7);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+}
+
+a {
+  text-decoration: none;
+}
+
+* {
+  box-sizing: border-box;
+}
