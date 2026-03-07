@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Navbar from "../components/Navbar";
 import {
-    addToWishlist,
+    addDestinationToWishlist,
     getAllRecommendations,
     getWishlists,
 } from "../lib/api";
@@ -27,7 +27,9 @@ type Recommendation = {
 
 type Wishlist = {
     id: number;
+    user_id: number;
     name: string;
+    description?: string | null;
     created_at: string;
 };
 
@@ -67,8 +69,7 @@ function getHolidayEmoji(type?: string | null) {
         t.includes("coast") ||
         t.includes("coastal") ||
         t.includes("seaside")
-    )
-        return "🏖️";
+    ) return "🏖️";
 
     if (t.includes("island")) return "🏝️";
 
@@ -77,15 +78,13 @@ function getHolidayEmoji(type?: string | null) {
         t.includes("park") ||
         t.includes("wildlife") ||
         t.includes("eco")
-    )
-        return "🌿";
+    ) return "🌿";
 
     if (
         t.includes("mountain") ||
         t.includes("hiking") ||
         t.includes("hill")
-    )
-        return "⛰️";
+    ) return "⛰️";
 
     if (
         t.includes("cultural") ||
@@ -94,22 +93,19 @@ function getHolidayEmoji(type?: string | null) {
         t.includes("heritage") ||
         t.includes("museum") ||
         t.includes("temple")
-    )
-        return "🏛️";
+    ) return "🏛️";
 
     if (
         t.includes("city") ||
         t.includes("urban") ||
         t.includes("metropolitan")
-    )
-        return "🏙️";
+    ) return "🏙️";
 
     if (
         t.includes("adventure") ||
         t.includes("activity") ||
         t.includes("sport")
-    )
-        return "🧗";
+    ) return "🧗";
 
     if (t.includes("desert")) return "🏜️";
     if (t.includes("lake")) return "🏞️";
@@ -122,9 +118,7 @@ function getHolidayEmoji(type?: string | null) {
 }
 
 export default function RecommendationsPage() {
-    const [allRecommendations, setAllRecommendations] = useState<Recommendation[]>(
-        []
-    );
+    const [allRecommendations, setAllRecommendations] = useState<Recommendation[]>([]);
     const [wishlists, setWishlists] = useState<Wishlist[]>([]);
     const [selectedWishlistId, setSelectedWishlistId] = useState<string>("");
     const [message, setMessage] = useState("");
@@ -138,27 +132,42 @@ export default function RecommendationsPage() {
 
     useEffect(() => {
         async function loadData() {
-            try {
-                setLoading(true);
+            setLoading(true);
 
+            try {
                 const recData = await getAllRecommendations();
                 setAllRecommendations(Array.isArray(recData) ? recData : []);
+            } catch (error) {
+                console.error(error);
+                setAllRecommendations([]);
+                setMessage("Failed to load recommendations.");
+            }
 
-                const token = localStorage.getItem("token");
-                if (token) {
-                    const wishlistData = await getWishlists();
+            const token = localStorage.getItem("token");
+            if (token) {
+                try {
+                    const wishlistData = await getWishlists(token);
                     setWishlists(wishlistData);
 
                     if (wishlistData.length > 0) {
                         setSelectedWishlistId(String(wishlistData[0].id));
                     }
+                } catch (error: any) {
+                    console.error(error);
+
+                    if (
+                        error?.message?.includes("Invalid token") ||
+                        error?.message?.includes("Missing Authorization")
+                    ) {
+                        localStorage.removeItem("token");
+                        setWishlists([]);
+                        setSelectedWishlistId("");
+                        setMessage("Your session expired. Please log in again on the Wishlists page.");
+                    }
                 }
-            } catch (error) {
-                console.error(error);
-                setAllRecommendations([]);
-            } finally {
-                setLoading(false);
             }
+
+            setLoading(false);
         }
 
         loadData();
@@ -188,7 +197,9 @@ export default function RecommendationsPage() {
                 (a, b) => (b.affordability_score ?? 0) - (a.affordability_score ?? 0)
             );
         } else if (scorePriority === "quietness") {
-            data.sort((a, b) => (b.quietness_score ?? 0) - (a.quietness_score ?? 0));
+            data.sort(
+                (a, b) => (b.quietness_score ?? 0) - (a.quietness_score ?? 0)
+            );
         } else if (scorePriority === "quality") {
             data.sort((a, b) => (b.quality_score ?? 0) - (a.quality_score ?? 0));
         } else if (scorePriority === "hidden_gem") {
@@ -218,7 +229,11 @@ export default function RecommendationsPage() {
         try {
             setAddingId(destinationId);
 
-            await addToWishlist(Number(selectedWishlistId), destinationId);
+            await addDestinationToWishlist(
+                token,
+                Number(selectedWishlistId),
+                destinationId
+            );
 
             setAddedMap((prev) => ({
                 ...prev,
@@ -227,7 +242,14 @@ export default function RecommendationsPage() {
 
             setMessage("Destination added to wishlist.");
         } catch (error: any) {
-            setMessage(error.message || "Failed to add destination to wishlist.");
+            if (error?.message?.includes("Invalid token")) {
+                localStorage.removeItem("token");
+                setWishlists([]);
+                setSelectedWishlistId("");
+                setMessage("Your session expired. Please log in again on the Wishlists page.");
+            } else {
+                setMessage(error.message || "Failed to add destination to wishlist.");
+            }
         } finally {
             setAddingId(null);
         }
@@ -339,8 +361,7 @@ export default function RecommendationsPage() {
                                 No destinations available
                             </h2>
                             <p className="text-gray-600">
-                                Check that your backend is running and the dataset has been
-                                imported.
+                                Check that your backend is running and the dataset has been imported.
                             </p>
                         </div>
                     ) : filteredRecommendations.length === 0 ? (
@@ -349,8 +370,7 @@ export default function RecommendationsPage() {
                                 No results match your filters
                             </h2>
                             <p className="text-gray-600">
-                                Try changing or clearing the filters to see all destinations
-                                again.
+                                Try changing or clearing the filters to see all destinations again.
                             </p>
                         </div>
                     ) : (
@@ -381,9 +401,7 @@ export default function RecommendationsPage() {
 
                                             <p className="text-gray-600 mb-4">
                                                 {destination.country ?? "Unknown country"}
-                                                {destination.continent
-                                                    ? ` • ${destination.continent}`
-                                                    : ""}
+                                                {destination.continent ? ` • ${destination.continent}` : ""}
                                             </p>
 
                                             <div className="grid grid-cols-2 gap-4 mb-5 text-sm">

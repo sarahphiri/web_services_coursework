@@ -1,48 +1,59 @@
 const API_BASE_URL = "http://127.0.0.1:8000";
 
-/* =========================
-   AUTH
-========================= */
-
-export async function registerUser(username: string, password: string) {
-    const res = await fetch(`${API_BASE_URL}/register`, {
-        method: "POST",
-        headers: {
+function getAuthHeaders(token?: string): HeadersInit {
+    if (token) {
+        return {
             "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ username, password }),
-    });
-
-    if (!res.ok) {
-        const errorText = await res.text();
-        console.error("Register error:", errorText);
-        throw new Error(errorText || "Failed to register user");
+            Authorization: `Bearer ${token}`,
+        };
     }
 
-    return res.json();
+    return {
+        "Content-Type": "application/json",
+    };
 }
 
-export async function loginUser(username: string, password: string) {
-    const res = await fetch(`${API_BASE_URL}/login`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ username, password }),
-    });
+async function parseResponse(res: Response) {
+    const text = await res.text();
 
-    if (!res.ok) {
-        const errorText = await res.text();
-        console.error("Login error:", errorText);
-        throw new Error(errorText || "Failed to login");
+    let data: any = null;
+    try {
+        data = text ? JSON.parse(text) : null;
+    } catch {
+        data = null;
     }
 
-    return res.json();
+    if (!res.ok) {
+        throw new Error(
+            data?.detail ||
+            data?.message ||
+            text ||
+            `Request failed with status ${res.status}`
+        );
+    }
+
+    return data;
 }
 
-/* =========================
-   RECOMMENDATIONS
-========================= */
+export async function registerUser(email: string, password: string) {
+    const res = await fetch(`${API_BASE_URL}/auth/register`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ email, password }),
+    });
+
+    return parseResponse(res);
+}
+
+export async function loginUser(email: string, password: string) {
+    const res = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ email, password }),
+    });
+
+    return parseResponse(res);
+}
 
 export async function getAllRecommendations(filters?: {
     continent?: string;
@@ -68,132 +79,88 @@ export async function getAllRecommendations(filters?: {
 
     const res = await fetch(url, {
         method: "GET",
-        headers: {
-            "Content-Type": "application/json",
-        },
+        headers: getAuthHeaders(),
         cache: "no-store",
     });
 
-    if (!res.ok) {
-        const errorText = await res.text();
-        console.error("Recommendations error:", errorText);
-        throw new Error(errorText || "Failed to fetch recommendations");
-    }
-
-    return res.json();
+    return parseResponse(res);
 }
 
-/* =========================
-   WISHLISTS
-========================= */
-
-export async function getWishlists() {
+export async function getWishlists(token: string) {
     const res = await fetch(`${API_BASE_URL}/wishlists`, {
         method: "GET",
-        headers: {
-            "Content-Type": "application/json",
-        },
+        headers: getAuthHeaders(token),
         cache: "no-store",
     });
 
-    if (!res.ok) {
-        const errorText = await res.text();
-        console.error("Wishlists error:", errorText);
-        throw new Error(errorText || "Failed to fetch wishlists");
-    }
-
-    return res.json();
+    return parseResponse(res);
 }
 
-export async function createWishlist(name: string) {
+export async function createWishlist(
+    token: string,
+    name: string,
+    description = ""
+) {
     const res = await fetch(`${API_BASE_URL}/wishlists`, {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ name }),
+        headers: getAuthHeaders(token),
+        body: JSON.stringify({ name, description }),
     });
 
-    if (!res.ok) {
-        const errorText = await res.text();
-        console.error("Create wishlist error:", errorText);
-        throw new Error(errorText || "Failed to create wishlist");
-    }
-
-    return res.json();
+    return parseResponse(res);
 }
 
-export async function deleteWishlist(wishlistId: number) {
+export async function deleteWishlist(token: string, wishlistId: number) {
     const res = await fetch(`${API_BASE_URL}/wishlists/${wishlistId}`, {
         method: "DELETE",
+        headers: getAuthHeaders(token),
     });
 
-    if (!res.ok) {
-        const errorText = await res.text();
-        console.error("Delete wishlist error:", errorText);
-        throw new Error(errorText || "Failed to delete wishlist");
-    }
-
-    return res.json();
+    return parseResponse(res);
 }
 
-export async function addToWishlist(
+export async function getWishlistItems(token: string, wishlistId: number) {
+    const res = await fetch(`${API_BASE_URL}/wishlists/${wishlistId}/items`, {
+        method: "GET",
+        headers: getAuthHeaders(token),
+        cache: "no-store",
+    });
+
+    return parseResponse(res);
+}
+
+export async function addDestinationToWishlist(
+    token: string,
     wishlistId: number,
     destinationId: number,
-    notes: string = ""
+    notes = "",
+    priority?: number
 ) {
     const res = await fetch(`${API_BASE_URL}/wishlists/${wishlistId}/items`, {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
+        headers: getAuthHeaders(token),
         body: JSON.stringify({
             destination_id: destinationId,
             notes,
+            priority,
         }),
     });
 
-    if (!res.ok) {
-        const errorText = await res.text();
-        console.error("Add to wishlist error:", errorText);
-        throw new Error(errorText || "Failed to add to wishlist");
-    }
-
-    return res.json();
+    return parseResponse(res);
 }
 
-export async function removeFromWishlist(wishlistId: number, itemId: number) {
+export async function deleteWishlistItem(
+    token: string,
+    wishlistId: number,
+    itemId: number
+) {
     const res = await fetch(
         `${API_BASE_URL}/wishlists/${wishlistId}/items/${itemId}`,
         {
             method: "DELETE",
+            headers: getAuthHeaders(token),
         }
     );
 
-    if (!res.ok) {
-        const errorText = await res.text();
-        console.error("Remove from wishlist error:", errorText);
-        throw new Error(errorText || "Failed to remove from wishlist");
-    }
-
-    return res.json();
-}
-
-/* IMPORTANT:
-   Your page is importing deleteWishlistItem, so export that exact name too.
-*/
-export async function deleteWishlistItem(
-    wishlistId: number,
-    itemId: number
-) {
-    return removeFromWishlist(wishlistId, itemId);
-}
-
-/* IMPORTANT:
-   Your page is importing getWishlistItems, so export that exact name too.
-*/
-export async function getWishlistItems(wishlistId: number) {
-    const wishlists = await getWishlists();
-    const wishlist = wishlists.find((w: any) => w.id === wishlistId);
-    return wishlist?.items || [];
+    return parseResponse(res);
 }

@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS destinations (
     avg_cost_usd REAL,
     rating REAL,
     annual_visitors_m REAL,
-    unesco INTEGER
+    unesco INTEGER DEFAULT 0
 )
 """)
 
@@ -60,5 +60,5 @@ with open(CSV_FILE, "r", encoding="utf-8-sig") as f:
 conn.commit()
 conn.close()
 
-print("Destinations successfully imported into", DATABASE)
-print("CSV loaded from", CSV_FILE)
+print("Destinations successfully imported into:", DATABASE)
+print("CSV loaded from:", CSV_FILE)

@@ -14,9 +14,10 @@ import {
 
 type Wishlist = {
     id: number;
+    user_id: number;
     name: string;
+    description?: string | null;
     created_at: string;
-    items?: WishlistItem[];
 };
 
 type WishlistItem = {
@@ -24,6 +25,7 @@ type WishlistItem = {
     wishlist_id: number;
     destination_id: number;
     notes?: string | null;
+    priority?: number | null;
     created_at: string;
     name?: string | null;
     country?: string | null;
@@ -46,8 +48,7 @@ function getHolidayEmoji(type?: string | null) {
         t.includes("coast") ||
         t.includes("coastal") ||
         t.includes("seaside")
-    )
-        return "🏖️";
+    ) return "🏖️";
 
     if (t.includes("island")) return "🏝️";
 
@@ -56,15 +57,13 @@ function getHolidayEmoji(type?: string | null) {
         t.includes("park") ||
         t.includes("wildlife") ||
         t.includes("eco")
-    )
-        return "🌿";
+    ) return "🌿";
 
     if (
         t.includes("mountain") ||
         t.includes("hiking") ||
         t.includes("hill")
-    )
-        return "⛰️";
+    ) return "⛰️";
 
     if (
         t.includes("cultural") ||
@@ -73,22 +72,19 @@ function getHolidayEmoji(type?: string | null) {
         t.includes("heritage") ||
         t.includes("museum") ||
         t.includes("temple")
-    )
-        return "🏛️";
+    ) return "🏛️";
 
     if (
         t.includes("city") ||
         t.includes("urban") ||
         t.includes("metropolitan")
-    )
-        return "🏙️";
+    ) return "🏙️";
 
     if (
         t.includes("adventure") ||
         t.includes("activity") ||
         t.includes("sport")
-    )
-        return "🧗";
+    ) return "🧗";
 
     if (t.includes("desert")) return "🏜️";
     if (t.includes("lake")) return "🏞️";
@@ -105,8 +101,9 @@ export default function WishlistsPage() {
     const [password, setPassword] = useState("");
 
     const [wishlistName, setWishlistName] = useState("");
-    const [token, setToken] = useState("");
+    const [wishlistDescription, setWishlistDescription] = useState("");
 
+    const [token, setToken] = useState("");
     const [wishlists, setWishlists] = useState<Wishlist[]>([]);
     const [selectedWishlistId, setSelectedWishlistId] = useState<string>("");
     const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
@@ -117,21 +114,21 @@ export default function WishlistsPage() {
         const savedToken = localStorage.getItem("token");
         if (savedToken) {
             setToken(savedToken);
-            loadWishlists();
+            loadWishlists(savedToken);
         }
     }, []);
 
     useEffect(() => {
-        if (selectedWishlistId) {
-            loadWishlistItems(Number(selectedWishlistId));
+        if (token && selectedWishlistId) {
+            loadWishlistItems(token, Number(selectedWishlistId));
         } else {
             setWishlistItems([]);
         }
-    }, [selectedWishlistId]);
+    }, [token, selectedWishlistId]);
 
-    async function loadWishlists() {
+    async function loadWishlists(authToken: string) {
         try {
-            const data = await getWishlists();
+            const data = await getWishlists(authToken);
             setWishlists(data);
 
             if (data.length > 0) {
@@ -150,9 +147,9 @@ export default function WishlistsPage() {
         }
     }
 
-    async function loadWishlistItems(wishlistId: number) {
+    async function loadWishlistItems(authToken: string, wishlistId: number) {
         try {
-            const data = await getWishlistItems(wishlistId);
+            const data = await getWishlistItems(authToken, wishlistId);
             setWishlistItems(data);
         } catch (error: any) {
             setMessage(error.message || "Failed to load wishlist items");
@@ -160,11 +157,29 @@ export default function WishlistsPage() {
     }
 
     async function handleRegister() {
+        const cleanEmail = email.trim();
+        const cleanPassword = password.trim();
+
+        if (!cleanEmail) {
+            setMessage("Email cannot be blank.");
+            return;
+        }
+
+        if (!cleanPassword) {
+            setMessage("Password cannot be blank.");
+            return;
+        }
+
+        if (cleanPassword.length < 6) {
+            setMessage("Password must be at least 6 characters long.");
+            return;
+        }
+
         setLoading(true);
         setMessage("");
 
         try {
-            await registerUser(email, password);
+            await registerUser(cleanEmail, cleanPassword);
             setMessage("Registration successful. You can now log in.");
         } catch (error: any) {
             setMessage(error.message || "Registration failed");
@@ -174,15 +189,31 @@ export default function WishlistsPage() {
     }
 
     async function handleLogin() {
+        const cleanEmail = email.trim();
+        const cleanPassword = password.trim();
+
+        if (!cleanEmail) {
+            setMessage("Email cannot be blank.");
+            return;
+        }
+
+        if (!cleanPassword) {
+            setMessage("Password cannot be blank.");
+            return;
+        }
+
         setLoading(true);
         setMessage("");
 
         try {
-            const data = await loginUser(email, password);
-            localStorage.setItem("token", data.access_token);
-            setToken(data.access_token);
+            const data = await loginUser(cleanEmail, cleanPassword);
+            const freshToken = data.access_token;
+
+            localStorage.setItem("token", freshToken);
+            setToken(freshToken);
             setMessage("Login successful");
-            await loadWishlists();
+
+            await loadWishlists(freshToken);
         } catch (error: any) {
             setMessage(error.message || "Login failed");
         } finally {
@@ -191,13 +222,16 @@ export default function WishlistsPage() {
     }
 
     async function handleCreateWishlist() {
+        const cleanName = wishlistName.trim();
+        const cleanDescription = wishlistDescription.trim();
+
         if (!token) {
-            setMessage("Please log in first");
+            setMessage("Please log in first.");
             return;
         }
 
-        if (!wishlistName.trim()) {
-            setMessage("Please enter a wishlist name");
+        if (!cleanName) {
+            setMessage("Wishlist name cannot be blank.");
             return;
         }
 
@@ -205,14 +239,33 @@ export default function WishlistsPage() {
         setMessage("");
 
         try {
-            const newWishlist = await createWishlist(wishlistName);
-            setMessage("Wishlist created successfully");
+            const newWishlist = await createWishlist(
+                token,
+                cleanName,
+                cleanDescription
+            );
+
+            setMessage("Wishlist created successfully.");
             setWishlistName("");
-            await loadWishlists();
+            setWishlistDescription("");
+
+            await loadWishlists(token);
             setSelectedWishlistId(String(newWishlist.id));
-            await loadWishlistItems(newWishlist.id);
+            await loadWishlistItems(token, newWishlist.id);
         } catch (error: any) {
-            setMessage(error.message || "Failed to create wishlist");
+            if (
+                error.message?.includes("Invalid token") ||
+                error.message?.includes("Missing Authorization")
+            ) {
+                localStorage.removeItem("token");
+                setToken("");
+                setWishlists([]);
+                setWishlistItems([]);
+                setSelectedWishlistId("");
+                setMessage("Your session expired. Please log in again.");
+            } else {
+                setMessage(error.message || "Failed to create wishlist.");
+            }
         } finally {
             setLoading(false);
         }
@@ -225,9 +278,20 @@ export default function WishlistsPage() {
         }
 
         try {
-            await deleteWishlist(Number(selectedWishlistId));
+            await deleteWishlist(token, Number(selectedWishlistId));
             setMessage("Wishlist deleted.");
-            await loadWishlists();
+
+            const updatedWishlists = await getWishlists(token);
+            setWishlists(updatedWishlists);
+
+            if (updatedWishlists.length > 0) {
+                const newId = String(updatedWishlists[0].id);
+                setSelectedWishlistId(newId);
+                await loadWishlistItems(token, Number(newId));
+            } else {
+                setSelectedWishlistId("");
+                setWishlistItems([]);
+            }
         } catch (error: any) {
             setMessage(error.message || "Failed to delete wishlist");
         }
@@ -240,9 +304,9 @@ export default function WishlistsPage() {
         }
 
         try {
-            await deleteWishlistItem(Number(selectedWishlistId), itemId);
+            await deleteWishlistItem(token, Number(selectedWishlistId), itemId);
             setMessage("Destination removed from wishlist.");
-            await loadWishlistItems(Number(selectedWishlistId));
+            await loadWishlistItems(token, Number(selectedWishlistId));
         } catch (error: any) {
             setMessage(error.message || "Failed to remove destination");
         }
@@ -273,8 +337,7 @@ export default function WishlistsPage() {
                         </h1>
 
                         <p className="text-gray-700 max-w-2xl">
-                            Create an account, log in, and organise low-stress destinations
-                            into travel wishlists.
+                            Create an account, log in, and organise low-stress destinations into travel wishlists.
                         </p>
                     </div>
 
@@ -346,6 +409,13 @@ export default function WishlistsPage() {
                                     className="w-full border border-gray-200 rounded-xl px-4 py-3"
                                 />
 
+                                <textarea
+                                    placeholder="Description"
+                                    value={wishlistDescription}
+                                    onChange={(e) => setWishlistDescription(e.target.value)}
+                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 min-h-[120px]"
+                                />
+
                                 <button
                                     onClick={handleCreateWishlist}
                                     disabled={loading}
@@ -361,7 +431,6 @@ export default function WishlistsPage() {
                         <div className="bg-white rounded-[1.5rem] p-6 shadow-md border border-gray-100 h-fit">
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="text-2xl font-semibold">Your Wishlists</h2>
-
                                 {selectedWishlistId && (
                                     <button
                                         onClick={handleDeleteWishlist}
@@ -379,21 +448,21 @@ export default function WishlistsPage() {
                             ) : (
                                 <div className="space-y-3">
                                     {wishlists.map((wishlist) => {
-                                        const isSelected =
-                                            String(wishlist.id) === selectedWishlistId;
+                                        const isSelected = String(wishlist.id) === selectedWishlistId;
 
                                         return (
                                             <button
                                                 key={wishlist.id}
-                                                onClick={() =>
-                                                    setSelectedWishlistId(String(wishlist.id))
-                                                }
+                                                onClick={() => setSelectedWishlistId(String(wishlist.id))}
                                                 className={`w-full text-left rounded-xl p-4 border transition ${isSelected
-                                                        ? "bg-[#eaf8f7] border-[#00A896]"
-                                                        : "bg-[#f9f9f9] border-gray-100 hover:border-[#00A896]"
+                                                    ? "bg-[#eaf8f7] border-[#00A896]"
+                                                    : "bg-[#f9f9f9] border-gray-100 hover:border-[#00A896]"
                                                     }`}
                                             >
                                                 <p className="font-semibold text-lg">{wishlist.name}</p>
+                                                <p className="text-sm text-gray-600">
+                                                    {wishlist.description || "No description provided"}
+                                                </p>
                                             </button>
                                         );
                                     })}
@@ -410,8 +479,7 @@ export default function WishlistsPage() {
                                 </p>
                             ) : wishlistItems.length === 0 ? (
                                 <p className="text-gray-600">
-                                    No destinations saved yet. Add some from the Recommendations
-                                    page.
+                                    No destinations saved yet. Add some from the Recommendations page.
                                 </p>
                             ) : (
                                 <div className="grid md:grid-cols-2 gap-4">
