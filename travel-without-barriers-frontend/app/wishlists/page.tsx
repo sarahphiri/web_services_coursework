@@ -8,14 +8,15 @@ import {
     getWishlists,
     createWishlist,
     getWishlistItems,
+    deleteWishlist,
+    deleteWishlistItem,
 } from "../lib/api";
 
 type Wishlist = {
     id: number;
-    user_id: number;
     name: string;
-    description?: string | null;
     created_at: string;
+    items?: WishlistItem[];
 };
 
 type WishlistItem = {
@@ -23,30 +24,89 @@ type WishlistItem = {
     wishlist_id: number;
     destination_id: number;
     notes?: string | null;
-    priority?: number | null;
     created_at: string;
-    destination: {
-        id: number;
-        name: string;
-        country: string;
-        continent?: string | null;
-        type?: string | null;
-        best_season?: string | null;
-        avg_cost_usd?: number | null;
-        rating?: number | null;
-        annual_visitors_m?: number | null;
-        unesco?: boolean | null;
-    };
+    name?: string | null;
+    country?: string | null;
+    continent?: string | null;
+    type?: string | null;
+    best_season?: string | null;
+    avg_cost_usd?: number | null;
+    rating?: number | null;
+    annual_visitors_m?: number | null;
+    unesco?: boolean | null;
 };
+
+function getHolidayEmoji(type?: string | null) {
+    if (!type) return "🌍";
+
+    const t = type.toLowerCase();
+
+    if (
+        t.includes("beach") ||
+        t.includes("coast") ||
+        t.includes("coastal") ||
+        t.includes("seaside")
+    )
+        return "🏖️";
+
+    if (t.includes("island")) return "🏝️";
+
+    if (
+        t.includes("nature") ||
+        t.includes("park") ||
+        t.includes("wildlife") ||
+        t.includes("eco")
+    )
+        return "🌿";
+
+    if (
+        t.includes("mountain") ||
+        t.includes("hiking") ||
+        t.includes("hill")
+    )
+        return "⛰️";
+
+    if (
+        t.includes("cultural") ||
+        t.includes("history") ||
+        t.includes("historical") ||
+        t.includes("heritage") ||
+        t.includes("museum") ||
+        t.includes("temple")
+    )
+        return "🏛️";
+
+    if (
+        t.includes("city") ||
+        t.includes("urban") ||
+        t.includes("metropolitan")
+    )
+        return "🏙️";
+
+    if (
+        t.includes("adventure") ||
+        t.includes("activity") ||
+        t.includes("sport")
+    )
+        return "🧗";
+
+    if (t.includes("desert")) return "🏜️";
+    if (t.includes("lake")) return "🏞️";
+    if (t.includes("forest")) return "🌲";
+    if (t.includes("ski") || t.includes("snow")) return "🎿";
+    if (t.includes("romantic")) return "💕";
+    if (t.includes("luxury")) return "✨";
+
+    return "🌍";
+}
 
 export default function WishlistsPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
 
     const [wishlistName, setWishlistName] = useState("");
-    const [wishlistDescription, setWishlistDescription] = useState("");
-
     const [token, setToken] = useState("");
+
     const [wishlists, setWishlists] = useState<Wishlist[]>([]);
     const [selectedWishlistId, setSelectedWishlistId] = useState<string>("");
     const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
@@ -57,25 +117,31 @@ export default function WishlistsPage() {
         const savedToken = localStorage.getItem("token");
         if (savedToken) {
             setToken(savedToken);
-            loadWishlists(savedToken);
+            loadWishlists();
         }
     }, []);
 
     useEffect(() => {
-        if (token && selectedWishlistId) {
-            loadWishlistItems(token, Number(selectedWishlistId));
+        if (selectedWishlistId) {
+            loadWishlistItems(Number(selectedWishlistId));
         } else {
             setWishlistItems([]);
         }
-    }, [token, selectedWishlistId]);
+    }, [selectedWishlistId]);
 
-    async function loadWishlists(authToken: string) {
+    async function loadWishlists() {
         try {
-            const data = await getWishlists(authToken);
+            const data = await getWishlists();
             setWishlists(data);
 
             if (data.length > 0) {
-                setSelectedWishlistId(String(data[0].id));
+                const stillExists = data.some(
+                    (w: Wishlist) => String(w.id) === selectedWishlistId
+                );
+
+                if (!stillExists) {
+                    setSelectedWishlistId(String(data[0].id));
+                }
             } else {
                 setSelectedWishlistId("");
             }
@@ -84,9 +150,9 @@ export default function WishlistsPage() {
         }
     }
 
-    async function loadWishlistItems(authToken: string, wishlistId: number) {
+    async function loadWishlistItems(wishlistId: number) {
         try {
-            const data = await getWishlistItems(authToken, wishlistId);
+            const data = await getWishlistItems(wishlistId);
             setWishlistItems(data);
         } catch (error: any) {
             setMessage(error.message || "Failed to load wishlist items");
@@ -116,7 +182,7 @@ export default function WishlistsPage() {
             localStorage.setItem("token", data.access_token);
             setToken(data.access_token);
             setMessage("Login successful");
-            await loadWishlists(data.access_token);
+            await loadWishlists();
         } catch (error: any) {
             setMessage(error.message || "Login failed");
         } finally {
@@ -130,20 +196,55 @@ export default function WishlistsPage() {
             return;
         }
 
+        if (!wishlistName.trim()) {
+            setMessage("Please enter a wishlist name");
+            return;
+        }
+
         setLoading(true);
         setMessage("");
 
         try {
-            const newWishlist = await createWishlist(token, wishlistName, wishlistDescription);
+            const newWishlist = await createWishlist(wishlistName);
             setMessage("Wishlist created successfully");
             setWishlistName("");
-            setWishlistDescription("");
-            await loadWishlists(token);
+            await loadWishlists();
             setSelectedWishlistId(String(newWishlist.id));
+            await loadWishlistItems(newWishlist.id);
         } catch (error: any) {
             setMessage(error.message || "Failed to create wishlist");
         } finally {
             setLoading(false);
+        }
+    }
+
+    async function handleDeleteWishlist() {
+        if (!token || !selectedWishlistId) {
+            setMessage("Please select a wishlist first.");
+            return;
+        }
+
+        try {
+            await deleteWishlist(Number(selectedWishlistId));
+            setMessage("Wishlist deleted.");
+            await loadWishlists();
+        } catch (error: any) {
+            setMessage(error.message || "Failed to delete wishlist");
+        }
+    }
+
+    async function handleRemoveFromWishlist(itemId: number) {
+        if (!token || !selectedWishlistId) {
+            setMessage("Please select a wishlist first.");
+            return;
+        }
+
+        try {
+            await deleteWishlistItem(Number(selectedWishlistId), itemId);
+            setMessage("Destination removed from wishlist.");
+            await loadWishlistItems(Number(selectedWishlistId));
+        } catch (error: any) {
+            setMessage(error.message || "Failed to remove destination");
         }
     }
 
@@ -172,7 +273,8 @@ export default function WishlistsPage() {
                         </h1>
 
                         <p className="text-gray-700 max-w-2xl">
-                            Create an account, log in, and organise low-stress destinations into travel wishlists.
+                            Create an account, log in, and organise low-stress destinations
+                            into travel wishlists.
                         </p>
                     </div>
 
@@ -244,13 +346,6 @@ export default function WishlistsPage() {
                                     className="w-full border border-gray-200 rounded-xl px-4 py-3"
                                 />
 
-                                <textarea
-                                    placeholder="Description"
-                                    value={wishlistDescription}
-                                    onChange={(e) => setWishlistDescription(e.target.value)}
-                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 min-h-[120px]"
-                                />
-
                                 <button
                                     onClick={handleCreateWishlist}
                                     disabled={loading}
@@ -264,7 +359,18 @@ export default function WishlistsPage() {
 
                     <div className="grid lg:grid-cols-[320px_1fr] gap-6">
                         <div className="bg-white rounded-[1.5rem] p-6 shadow-md border border-gray-100 h-fit">
-                            <h2 className="text-2xl font-semibold mb-4">Your Wishlists</h2>
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-2xl font-semibold">Your Wishlists</h2>
+
+                                {selectedWishlistId && (
+                                    <button
+                                        onClick={handleDeleteWishlist}
+                                        className="text-sm px-3 py-2 rounded-full bg-red-50 text-red-600 hover:bg-red-100 transition"
+                                    >
+                                        Delete
+                                    </button>
+                                )}
+                            </div>
 
                             {wishlists.length === 0 ? (
                                 <p className="text-gray-600">
@@ -273,21 +379,21 @@ export default function WishlistsPage() {
                             ) : (
                                 <div className="space-y-3">
                                     {wishlists.map((wishlist) => {
-                                        const isSelected = String(wishlist.id) === selectedWishlistId;
+                                        const isSelected =
+                                            String(wishlist.id) === selectedWishlistId;
 
                                         return (
                                             <button
                                                 key={wishlist.id}
-                                                onClick={() => setSelectedWishlistId(String(wishlist.id))}
+                                                onClick={() =>
+                                                    setSelectedWishlistId(String(wishlist.id))
+                                                }
                                                 className={`w-full text-left rounded-xl p-4 border transition ${isSelected
                                                         ? "bg-[#eaf8f7] border-[#00A896]"
                                                         : "bg-[#f9f9f9] border-gray-100 hover:border-[#00A896]"
                                                     }`}
                                             >
                                                 <p className="font-semibold text-lg">{wishlist.name}</p>
-                                                <p className="text-sm text-gray-600">
-                                                    {wishlist.description || "No description provided"}
-                                                </p>
                                             </button>
                                         );
                                     })}
@@ -304,7 +410,8 @@ export default function WishlistsPage() {
                                 </p>
                             ) : wishlistItems.length === 0 ? (
                                 <p className="text-gray-600">
-                                    No destinations saved yet. Add some from the Recommendations page.
+                                    No destinations saved yet. Add some from the Recommendations
+                                    page.
                                 </p>
                             ) : (
                                 <div className="grid md:grid-cols-2 gap-4">
@@ -315,31 +422,31 @@ export default function WishlistsPage() {
                                         >
                                             <div className="flex items-start justify-between gap-3 mb-3">
                                                 <h3 className="text-xl font-semibold text-[#333333]">
-                                                    {item.destination.name}
+                                                    {item.name ?? "Unknown destination"}
                                                 </h3>
-                                                <span className="text-2xl">🌍</span>
+                                                <span className="text-2xl">
+                                                    {getHolidayEmoji(item.type)}
+                                                </span>
                                             </div>
 
                                             <p className="text-gray-600 mb-3">
-                                                {item.destination.country}
-                                                {item.destination.continent
-                                                    ? ` • ${item.destination.continent}`
-                                                    : ""}
+                                                {item.country ?? "Unknown country"}
+                                                {item.continent ? ` • ${item.continent}` : ""}
                                             </p>
 
-                                            <div className="grid grid-cols-2 gap-3 text-sm">
+                                            <div className="grid grid-cols-2 gap-3 text-sm mb-4">
                                                 <div className="bg-white rounded-xl p-3">
                                                     <p className="text-gray-500 mb-1">Rating</p>
                                                     <p className="font-semibold text-[#FFD166]">
-                                                        ⭐ {item.destination.rating ?? "N/A"}
+                                                        ⭐ {item.rating ?? "N/A"}
                                                     </p>
                                                 </div>
 
                                                 <div className="bg-white rounded-xl p-3">
                                                     <p className="text-gray-500 mb-1">Cost</p>
                                                     <p className="font-semibold text-[#333333]">
-                                                        {item.destination.avg_cost_usd != null
-                                                            ? `$${item.destination.avg_cost_usd}`
+                                                        {item.avg_cost_usd != null
+                                                            ? `$${item.avg_cost_usd}`
                                                             : "N/A"}
                                                     </p>
                                                 </div>
@@ -347,23 +454,24 @@ export default function WishlistsPage() {
                                                 <div className="bg-white rounded-xl p-3">
                                                     <p className="text-gray-500 mb-1">Type</p>
                                                     <p className="font-semibold text-[#007788]">
-                                                        {item.destination.type ?? "N/A"}
+                                                        {item.type ?? "N/A"}
                                                     </p>
                                                 </div>
 
                                                 <div className="bg-white rounded-xl p-3">
                                                     <p className="text-gray-500 mb-1">Season</p>
                                                     <p className="font-semibold text-[#00A896]">
-                                                        {item.destination.best_season ?? "N/A"}
+                                                        {item.best_season ?? "N/A"}
                                                     </p>
                                                 </div>
                                             </div>
 
-                                            {item.notes && (
-                                                <p className="text-sm text-gray-600 mt-4">
-                                                    Notes: {item.notes}
-                                                </p>
-                                            )}
+                                            <button
+                                                onClick={() => handleRemoveFromWishlist(item.id)}
+                                                className="w-full rounded-full bg-red-50 text-red-600 py-3 font-medium hover:bg-red-100 transition"
+                                            >
+                                                Remove from Wishlist
+                                            </button>
                                         </div>
                                     ))}
                                 </div>
