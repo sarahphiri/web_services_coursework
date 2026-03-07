@@ -341,6 +341,133 @@ Testing ensures the reliability of both the recommendation logic and API endpoin
 
 ---
 
+# Quick Start (Step-by-Step)
+
+Follow these steps to run the API locally.
+
+### 1. Clone the repository
+
+git clone https://github.com/sarahphiri/web_services_coursework.git  
+cd web_services_coursework
+
+### 2. Create a virtual environment
+
+python -m venv .venv
+
+Activate the environment:
+
+Mac/Linux
+
+source .venv/bin/activate
+
+Windows
+
+.venv\Scripts\activate
+
+### 3. Install dependencies
+
+pip install -r requirements.txt
+
+### 4. Import the dataset
+
+Before running the API, populate the database with the tourism dataset.
+
+python scripts/import_destinations.py
+
+This script will:
+
+- load the dataset using Pandas
+- perform basic data cleaning
+- create the SQLite database if it does not exist
+- insert the destination records into the `destinations` table
+
+### 5. Start the API server
+
+uvicorn app.main:app --reload
+
+The API will start locally at:
+
+http://127.0.0.1:8000
+
+### 6. Open the API documentation
+
+FastAPI automatically generates interactive documentation.
+
+Swagger UI:
+
+http://127.0.0.1:8000/docs
+
+ReDoc:
+
+http://127.0.0.1:8000/redoc
+
+# Using the API
+
+Once the server is running, you can interact with the API using:
+
+- Swagger UI (recommended)
+- Postman
+- curl
+- any HTTP client
+
+### Example workflow
+
+1) Retrieve available destinations
+
+GET /destinations
+
+Example:
+
+GET http://127.0.0.1:8000/destinations?limit=20&offset=0
+
+This returns a paginated list of travel destinations.
+
+---
+
+2) Register a user account
+
+POST /auth/register
+
+Example request body:
+
+{
+  "email": "user@example.com",
+  "password": "securepassword"
+}
+
+---
+
+3) Log in to obtain a JWT token
+
+POST /auth/login
+
+Response:
+
+{
+  "access_token": "...",
+  "token_type": "bearer"
+}
+
+---
+
+4) Create a wishlist
+
+POST /wishlists
+
+Authenticated users can create wishlists to store destinations they are interested in.
+
+---
+
+5) Add destinations to a wishlist
+
+POST /wishlists/{id}/items
+
+This allows users to save recommended destinations for future trips.
+
+---
+
+This workflow demonstrates how the API can be used to discover destinations and organise travel plans.
+
 # Error Handling
 
 The API implements structured error handling to ensure robust behaviour.

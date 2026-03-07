@@ -1,388 +1,798 @@
-from fastapi import FastAPI, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+from fastapi import FastAPI, HTTPException, Query, Header
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, field_validator
+import sqlite3
+import os
+from typing import Optional
 
-from app.scoring import inverse_minmax, minmax_norm, hidden_gem_score
-from app.db import get_db
-from app.models import Destination
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATABASE = os.path.join(PROJECT_ROOT, "travel.db")
 
-from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.exc import IntegrityError
+app = FastAPI()
 
-from app.auth import hash_password, verify_password, create_access_token
-from app.schemas import UserCreate, UserOut, TokenOut
-from app.models import User
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-from app.deps import get_current_user
-from app.models import Wishlist, User
-from app.schemas import WishlistCreate, WishlistUpdate, WishlistOut
 
-from sqlalchemy.exc import IntegrityError
+def get_connection():
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-from app.models import WishlistItem, Wishlist, Destination
-from app.schemas import WishlistItemCreate, WishlistItemUpdate, WishlistItemOut
 
-from app.errors import install_error_handlers
+def init_db():
+    conn = get_connection()
+    cursor = conn.cursor()
 
-app = FastAPI(title="Travel Without Barriers API")
-install_error_handlers(app)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS destinations (
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            country TEXT,
+            continent TEXT,
+            type TEXT,
+            best_season TEXT,
+            avg_cost_usd REAL,
+            rating REAL,
+            annual_visitors_m REAL,
+            unesco INTEGER DEFAULT 0
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS wishlists (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            name TEXT NOT NULL,
+            description TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS wishlist_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            wishlist_id INTEGER NOT NULL,
+            destination_id INTEGER NOT NULL,
+            notes TEXT,
+            priority INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (wishlist_id) REFERENCES wishlists(id),
+            FOREIGN KEY (destination_id) REFERENCES destinations(id)
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+@app.on_event("startup")
+def startup():
+    init_db()
+
+
+class AuthRequest(BaseModel):
+    email: str
+    password: str
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Email cannot be blank")
+        return value
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Password cannot be blank")
+        if len(value) < 6:
+            raise ValueError("Password must be at least 6 characters long")
+        return value
+
+
+class WishlistCreateRequest(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Wishlist name cannot be blank")
+        return value
+
+
+class WishlistUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
+class WishlistItemCreateRequest(BaseModel):
+    destination_id: int
+    notes: Optional[str] = None
+    priority: Optional[int] = None
+
+
+class WishlistItemUpdateRequest(BaseModel):
+    notes: Optional[str] = None
+    priority: Optional[int] = None
+
+
+def get_user_id_from_auth(authorization: Optional[str]) -> int:
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+
+    if not authorization.startswith("Bearer demo-token-"):
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    try:
+        return int(authorization.replace("Bearer demo-token-", ""))
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
 
 @app.get("/")
 def root():
-    return {"message": "Travel Without Barriers API"}
+    return {"message": "FastAPI is running", "database": DATABASE}
 
 
-# GET /destinations
+# =========================
+# AUTH
+# =========================
+
+@app.post("/auth/register")
+def register_user(payload: AuthRequest):
+    email = payload.email.strip().lower()
+    password = payload.password.strip()
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # Check if user exists
+    cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
+    if cursor.fetchone():
+        conn.close()
+        raise HTTPException(
+            status_code=400,
+            detail="An account with this email already exists."
+        )
+
+    cursor.execute(
+        "INSERT INTO users (email, password) VALUES (?, ?)",
+        (email, password)
+    )
+
+    conn.commit()
+    user_id = cursor.lastrowid
+    conn.close()
+
+    return {
+        "message": "User registered successfully",
+        "user_id": user_id
+    }
+
+
+@app.post("/auth/login")
+def login_user(payload: AuthRequest):
+    email = payload.email.strip().lower()
+    password = payload.password.strip()
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT id, email FROM users WHERE email = ? AND password = ?",
+        (email, password)
+    )
+    user = cursor.fetchone()
+    conn.close()
+
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    return {
+        "access_token": f"demo-token-{user['id']}",
+        "token_type": "bearer",
+        "user": {
+            "id": user["id"],
+            "email": user["email"]
+        }
+    }
+
+
+# =========================
+# DESTINATIONS
+# =========================
+
 @app.get("/destinations")
 def get_destinations(
-    limit: int | None = Query(None, ge=1),
-    offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db),
+    limit: int = Query(default=100, ge=1),
+    offset: int = Query(default=0, ge=0)
 ):
-    q = db.query(Destination).offset(offset)
-    if limit is not None:
-        q = q.limit(limit)
-    return q.all()
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT
+            id, name, country, continent, type, best_season,
+            avg_cost_usd, rating, annual_visitors_m, unesco
+        FROM destinations
+        ORDER BY id ASC
+        LIMIT ? OFFSET ?
+    """, (limit, offset))
+    rows = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return rows
+
 
 @app.get("/destinations/count")
-def destinations_count(db: Session = Depends(get_db)):
-    total = db.query(func.count(Destination.id)).scalar()
-    return {"total": total}
+def get_destinations_count():
+    conn = get_connection()
+    cursor = conn.cursor()
 
-# GET /destinations/{id}
+    cursor.execute("SELECT COUNT(*) as count FROM destinations")
+    count = cursor.fetchone()["count"]
+    conn.close()
+
+    return {"count": count}
+
+
 @app.get("/destinations/{destination_id}")
-def get_destination(destination_id: int, db: Session = Depends(get_db)):
+def get_destination(destination_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
 
-    destination = db.query(Destination).filter(
-        Destination.id == destination_id
-    ).first()
+    cursor.execute("""
+        SELECT
+            id, name, country, continent, type, best_season,
+            avg_cost_usd, rating, annual_visitors_m, unesco
+        FROM destinations
+        WHERE id = ?
+    """, (destination_id,))
+    row = cursor.fetchone()
+    conn.close()
 
-    if not destination:
+    if not row:
         raise HTTPException(status_code=404, detail="Destination not found")
 
-    return destination
+    return dict(row)
 
-#added for recommendations
+
+# =========================
+# RECOMMENDATIONS
+# =========================
+
 @app.get("/recommendations")
 def get_recommendations(
-    limit: int = Query(10, ge=1, le=50),
-    budget: float | None = Query(None, gt=0),
-    avoid_peak: bool = True,
-    db: Session = Depends(get_db),
+    continent: Optional[str] = Query(default=None),
+    country: Optional[str] = Query(default=None),
+    min_rating: Optional[float] = Query(default=None),
+    max_cost: Optional[float] = Query(default=None),
+    sort_by: Optional[str] = Query(default=None),
 ):
-    destinations = db.query(Destination).all()
-    if not destinations:
-        raise HTTPException(status_code=404, detail="No destinations found")
+    conn = get_connection()
+    cursor = conn.cursor()
 
-    # Collect ranges for normalisation
-    costs = [d.avg_cost_usd for d in destinations if d.avg_cost_usd is not None]
-    visitors = [d.annual_visitors_m for d in destinations if d.annual_visitors_m is not None]
-    ratings = [d.rating for d in destinations if d.rating is not None]
+    query = """
+        SELECT
+            id,
+            name,
+            country,
+            continent,
+            type,
+            best_season,
+            avg_cost_usd,
+            rating,
+            annual_visitors_m,
+            unesco,
+            ROUND(
+                CASE
+                    WHEN avg_cost_usd IS NULL THEN 0
+                    ELSE 1000.0 / (avg_cost_usd + 1)
+                END, 2
+            ) AS affordability_score,
+            ROUND(
+                CASE
+                    WHEN annual_visitors_m IS NULL THEN 0
+                    ELSE 10.0 / (annual_visitors_m + 1)
+                END, 2
+            ) AS quietness_score,
+            ROUND(COALESCE(rating, 0), 2) AS quality_score,
+            ROUND(
+                COALESCE(rating, 0) + 
+                CASE
+                    WHEN annual_visitors_m IS NULL THEN 0
+                    ELSE 10.0 / (annual_visitors_m + 1)
+                END,
+                2
+            ) AS hidden_gem_score,
+            ROUND(
+                CASE
+                    WHEN avg_cost_usd IS NULL THEN 0
+                    ELSE 1000.0 / (avg_cost_usd + 1)
+                END +
+                CASE
+                    WHEN annual_visitors_m IS NULL THEN 0
+                    ELSE 10.0 / (annual_visitors_m + 1)
+                END +
+                COALESCE(rating, 0),
+                2
+            ) AS barrier_score
+        FROM destinations
+        WHERE 1=1
+    """
+    params = []
 
-    # If a column is missing entirely, choose safe ranges
-    cost_min, cost_max = (min(costs), max(costs)) if costs else (0.0, 1.0)
-    vis_min, vis_max = (min(visitors), max(visitors)) if visitors else (0.0, 1.0)
-    rating_min, rating_max = (min(ratings), max(ratings)) if ratings else (0.0, 5.0)
+    if continent:
+        query += " AND continent = ?"
+        params.append(continent)
 
-    results = []
+    if country:
+        query += " AND country LIKE ?"
+        params.append(f"%{country}%")
 
-    for d in destinations:
-        # Core metrics (0..1)
-        affordability = inverse_minmax(d.avg_cost_usd, cost_min, cost_max)  # cheaper -> higher score
-        quietness = inverse_minmax(d.annual_visitors_m, vis_min, vis_max)   # fewer visitors -> higher score
+    if min_rating is not None:
+        query += " AND rating >= ?"
+        params.append(min_rating)
 
-        # quality: rating 0..5 -> 0..1 (or min-max)
-        quality = (d.rating / 5.0) if d.rating is not None else 0.0
-        quality = max(0.0, min(1.0, quality))
+    if max_cost is not None:
+        query += " AND avg_cost_usd <= ?"
+        params.append(max_cost)
 
-        # "Hidden gem": high rating + low visitors (log penalty)
-        hidden_gem = hidden_gem_score(d.rating, d.annual_visitors_m)
+    allowed_sort = {
+        "rating": "rating DESC",
+        "cost_asc": "avg_cost_usd ASC",
+        "cost_desc": "avg_cost_usd DESC",
+        "visitors_asc": "annual_visitors_m ASC",
+        "visitors_desc": "annual_visitors_m DESC",
+        "name": "name ASC",
+        "affordability": "affordability_score DESC",
+        "quietness": "quietness_score DESC",
+        "quality": "quality_score DESC",
+        "hidden_gem": "hidden_gem_score DESC",
+    }
 
-        # Seasonal pressure/relief (your improved idea)
-        # We treat high visitors as "pressure" proxy and invert it to "relief".
-        season_pressure = minmax_norm(d.annual_visitors_m, vis_min, vis_max)
-        season_relief = 1.0 - season_pressure
+    query += f" ORDER BY {allowed_sort.get(sort_by, 'barrier_score DESC')}"
 
-        # Budget penalty (optional): if user provides budget, penalise above-budget destinations.
-        # This makes affordability more "real" for the user.
-        budget_penalty = 0.0
-        if budget is not None and d.avg_cost_usd is not None and budget > 0:
-            if d.avg_cost_usd > budget:
-                # penalty grows with how far above budget it is (capped)
-                budget_penalty = min(0.4, (d.avg_cost_usd - budget) / budget * 0.4)
+    cursor.execute(query, params)
+    rows = [dict(row) for row in cursor.fetchall()]
+    conn.close()
 
-        # Peak-season barrier adjustment (optional)
-        # If avoid_peak=True, slightly penalise destinations that are likely "peak pressure" destinations.
-        # We approximate this using season_pressure (high visitors => more likely peak stress).
-        peak_penalty = 0.15 * season_pressure if avoid_peak else 0.0
-
-        # Final Barrier-Friendly Score (weights you can justify in your report)
-        barrier_score = (
-            0.35 * affordability +
-            0.30 * quietness +
-            0.20 * quality +
-            0.10 * hidden_gem +
-            0.05 * season_relief
-        ) - budget_penalty - peak_penalty
-
-        results.append({
-            "id": d.id,
-            "name": d.name,
-            "country": d.country,
-            "continent": d.continent,
-            "type": d.type,
-            "best_season": d.best_season,
-            "avg_cost_usd": d.avg_cost_usd,
-            "rating": d.rating,
-            "annual_visitors_m": d.annual_visitors_m,
-            "unesco": d.unesco,
-
-            "affordability_score": round(affordability, 3),
-            "quietness_score": round(quietness, 3),
-            "quality_score": round(quality, 3),
-            "hidden_gem_score": round(hidden_gem, 3),
-            "season_relief_score": round(season_relief, 3),
-
-            "barrier_score": round(barrier_score, 3),
-            "explain": [
-                "Lower cost improves affordability" if affordability >= 0.6 else "Higher cost may reduce affordability",
-                "Lower visitors suggests a calmer destination" if quietness >= 0.6 else "Higher visitors may feel busier",
-                "High ratings increase confidence" if quality >= 0.7 else "Moderate ratings",
-                "Hidden-gem bonus: well-rated with fewer visitors" if hidden_gem >= 0.4 else "Popular/high-traffic destination"
-            ]
-        })
-
-    # Sort best-first
-    results.sort(key=lambda x: x["barrier_score"], reverse=True)
-    return results[:max(1, min(limit, 50))]
-
-@app.post("/auth/register", response_model=UserOut)
-def register_user(payload: UserCreate, db: Session = Depends(get_db)):
-    user = User(
-        email=payload.email.lower().strip(),
-        password_hash=hash_password(payload.password),
-    )
-    db.add(user)
-    try:
-        db.commit()
-        db.refresh(user)
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(status_code=409, detail="Email already registered")
-
-    return user
+    return rows
 
 
-@app.post("/auth/login", response_model=TokenOut)
-def login_user(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db),
-):
-    email = form_data.username.lower().strip()
-    user = db.query(User).filter(User.email == email).first()
-    if not user or not verify_password(form_data.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Incorrect email or password")
+# =========================
+# WISHLISTS
+# =========================
 
-    token = create_access_token(subject=user.email)
-    return {"access_token": token, "token_type": "bearer"}
+@app.get("/wishlists")
+def list_wishlists(authorization: Optional[str] = Header(default=None)):
+    user_id = get_user_id_from_auth(authorization)
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, user_id, name, description, created_at
+        FROM wishlists
+        WHERE user_id = ?
+        ORDER BY created_at DESC, id DESC
+    """, (user_id,))
+    rows = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+
+    return rows
 
 
-@app.post("/wishlists", response_model=WishlistOut)
+@app.post("/wishlists")
 def create_wishlist(
-    payload: WishlistCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    payload: WishlistCreateRequest,
+    authorization: Optional[str] = Header(default=None)
 ):
-    wishlist = Wishlist(
-        user_id=current_user.id,
-        name=payload.name.strip(),
-        description=payload.description.strip() if payload.description else None,
-    )
-    db.add(wishlist)
-    db.commit()
-    db.refresh(wishlist)
-    return wishlist
+    user_id = get_user_id_from_auth(authorization)
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO wishlists (user_id, name, description)
+        VALUES (?, ?, ?)
+    """, (user_id, payload.name, payload.description))
+    conn.commit()
+
+    wishlist_id = cursor.lastrowid
+
+    cursor.execute("""
+        SELECT id, user_id, name, description, created_at
+        FROM wishlists
+        WHERE id = ?
+    """, (wishlist_id,))
+    row = dict(cursor.fetchone())
+    conn.close()
+
+    return row
 
 
-@app.get("/wishlists", response_model=list[WishlistOut])
-def list_wishlists(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    return (
-        db.query(Wishlist)
-        .filter(Wishlist.user_id == current_user.id)
-        .order_by(Wishlist.created_at.desc())
-        .all()
-    )
-
-
-@app.get("/wishlists/{wishlist_id}", response_model=WishlistOut)
+@app.get("/wishlists/{wishlist_id}")
 def get_wishlist(
     wishlist_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    authorization: Optional[str] = Header(default=None)
 ):
-    wishlist = (
-        db.query(Wishlist)
-        .filter(Wishlist.id == wishlist_id, Wishlist.user_id == current_user.id)
-        .first()
-    )
-    if not wishlist:
+    user_id = get_user_id_from_auth(authorization)
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, user_id, name, description, created_at
+        FROM wishlists
+        WHERE id = ? AND user_id = ?
+    """, (wishlist_id, user_id))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
         raise HTTPException(status_code=404, detail="Wishlist not found")
-    return wishlist
+
+    return dict(row)
 
 
-@app.patch("/wishlists/{wishlist_id}", response_model=WishlistOut)
+@app.patch("/wishlists/{wishlist_id}")
 def update_wishlist(
     wishlist_id: int,
-    payload: WishlistUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    payload: WishlistUpdateRequest,
+    authorization: Optional[str] = Header(default=None)
 ):
-    wishlist = (
-        db.query(Wishlist)
-        .filter(Wishlist.id == wishlist_id, Wishlist.user_id == current_user.id)
-        .first()
-    )
-    if not wishlist:
+    user_id = get_user_id_from_auth(authorization)
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, name, description
+        FROM wishlists
+        WHERE id = ? AND user_id = ?
+    """, (wishlist_id, user_id))
+    current = cursor.fetchone()
+
+    if not current:
+        conn.close()
         raise HTTPException(status_code=404, detail="Wishlist not found")
 
-    if payload.name is not None:
-        wishlist.name = payload.name.strip()
-    if payload.description is not None:
-        wishlist.description = payload.description.strip() if payload.description else None
+    new_name = payload.name if payload.name is not None else current["name"]
+    new_description = (
+        payload.description if payload.description is not None else current["description"]
+    )
 
-    db.commit()
-    db.refresh(wishlist)
-    return wishlist
+    cursor.execute("""
+        UPDATE wishlists
+        SET name = ?, description = ?
+        WHERE id = ? AND user_id = ?
+    """, (new_name, new_description, wishlist_id, user_id))
+    conn.commit()
+
+    cursor.execute("""
+        SELECT id, user_id, name, description, created_at
+        FROM wishlists
+        WHERE id = ? AND user_id = ?
+    """, (wishlist_id, user_id))
+    updated = dict(cursor.fetchone())
+    conn.close()
+
+    return updated
 
 
 @app.delete("/wishlists/{wishlist_id}")
 def delete_wishlist(
     wishlist_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    authorization: Optional[str] = Header(default=None)
 ):
-    wishlist = (
-        db.query(Wishlist)
-        .filter(Wishlist.id == wishlist_id, Wishlist.user_id == current_user.id)
-        .first()
-    )
-    if not wishlist:
+    user_id = get_user_id_from_auth(authorization)
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id FROM wishlists
+        WHERE id = ? AND user_id = ?
+    """, (wishlist_id, user_id))
+    exists = cursor.fetchone()
+
+    if not exists:
+        conn.close()
         raise HTTPException(status_code=404, detail="Wishlist not found")
 
-    db.delete(wishlist)
-    db.commit()
-    return {"message": "Wishlist deleted"}
+    cursor.execute("DELETE FROM wishlist_items WHERE wishlist_id = ?", (wishlist_id,))
+    cursor.execute("DELETE FROM wishlists WHERE id = ? AND user_id = ?", (wishlist_id, user_id))
+    conn.commit()
+    conn.close()
+
+    return {"message": "Wishlist deleted successfully"}
 
 
-def _get_owned_wishlist(db: Session, wishlist_id: int, user_id: int) -> Wishlist:
-    wishlist = (
-        db.query(Wishlist)
-        .filter(Wishlist.id == wishlist_id, Wishlist.user_id == user_id)
-        .first()
-    )
-    if not wishlist:
-        raise HTTPException(status_code=404, detail="Wishlist not found")
-    return wishlist
-
-
-@app.post("/wishlists/{wishlist_id}/items", response_model=WishlistItemOut, status_code=201)
+@app.post("/wishlists/{wishlist_id}/items")
 def add_wishlist_item(
     wishlist_id: int,
-    payload: WishlistItemCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    payload: WishlistItemCreateRequest,
+    authorization: Optional[str] = Header(default=None)
 ):
-    _get_owned_wishlist(db, wishlist_id, current_user.id)
+    user_id = get_user_id_from_auth(authorization)
 
-    # Ensure destination exists
-    destination = db.query(Destination).filter(Destination.id == payload.destination_id).first()
-    if not destination:
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id FROM wishlists
+        WHERE id = ? AND user_id = ?
+    """, (wishlist_id, user_id))
+    if not cursor.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="Wishlist not found")
+
+    cursor.execute("SELECT id FROM destinations WHERE id = ?", (payload.destination_id,))
+    if not cursor.fetchone():
+        conn.close()
         raise HTTPException(status_code=404, detail="Destination not found")
 
-    item = WishlistItem(
-        wishlist_id=wishlist_id,
-        destination_id=payload.destination_id,
-        notes=payload.notes.strip() if payload.notes else None,
-        priority=payload.priority,
-    )
+    cursor.execute("""
+        SELECT id FROM wishlist_items
+        WHERE wishlist_id = ? AND destination_id = ?
+    """, (wishlist_id, payload.destination_id))
+    if cursor.fetchone():
+        conn.close()
+        raise HTTPException(status_code=400, detail="Destination already in wishlist")
 
-    db.add(item)
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        # most likely unique constraint: destination already in wishlist
-        raise HTTPException(status_code=409, detail="Destination already in wishlist")
+    cursor.execute("""
+        INSERT INTO wishlist_items (wishlist_id, destination_id, notes, priority)
+        VALUES (?, ?, ?, ?)
+    """, (wishlist_id, payload.destination_id, payload.notes, payload.priority))
+    conn.commit()
 
-    db.refresh(item)
-    return item
+    item_id = cursor.lastrowid
+
+    cursor.execute("""
+        SELECT
+            wi.id,
+            wi.wishlist_id,
+            wi.destination_id,
+            wi.notes,
+            wi.priority,
+            wi.created_at,
+            d.id as destination_inner_id,
+            d.name,
+            d.country,
+            d.continent,
+            d.type,
+            d.best_season,
+            d.avg_cost_usd,
+            d.rating,
+            d.annual_visitors_m,
+            d.unesco
+        FROM wishlist_items wi
+        JOIN destinations d ON wi.destination_id = d.id
+        WHERE wi.id = ?
+    """, (item_id,))
+    row = dict(cursor.fetchone())
+    conn.close()
+
+    return row
 
 
-@app.get("/wishlists/{wishlist_id}/items", response_model=list[WishlistItemOut])
+@app.get("/wishlists/{wishlist_id}/items")
 def list_wishlist_items(
     wishlist_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    authorization: Optional[str] = Header(default=None)
 ):
-    _get_owned_wishlist(db, wishlist_id, current_user.id)
+    user_id = get_user_id_from_auth(authorization)
 
-    items = (
-        db.query(WishlistItem)
-        .filter(WishlistItem.wishlist_id == wishlist_id)
-        .order_by(WishlistItem.created_at.desc())
-        .all()
-    )
-    return items
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id FROM wishlists
+        WHERE id = ? AND user_id = ?
+    """, (wishlist_id, user_id))
+    if not cursor.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="Wishlist not found")
+
+    cursor.execute("""
+        SELECT
+            wi.id,
+            wi.wishlist_id,
+            wi.destination_id,
+            wi.notes,
+            wi.priority,
+            wi.created_at,
+            d.id as destination_inner_id,
+            d.name,
+            d.country,
+            d.continent,
+            d.type,
+            d.best_season,
+            d.avg_cost_usd,
+            d.rating,
+            d.annual_visitors_m,
+            d.unesco
+        FROM wishlist_items wi
+        JOIN destinations d ON wi.destination_id = d.id
+        WHERE wi.wishlist_id = ?
+        ORDER BY wi.created_at DESC, wi.id DESC
+    """, (wishlist_id,))
+    rows = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+
+    return rows
 
 
-@app.patch("/wishlists/{wishlist_id}/items/{item_id}", response_model=WishlistItemOut)
+@app.get("/wishlists/{wishlist_id}/items/{item_id}")
+def get_wishlist_item(
+    wishlist_id: int,
+    item_id: int,
+    authorization: Optional[str] = Header(default=None)
+):
+    user_id = get_user_id_from_auth(authorization)
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id FROM wishlists
+        WHERE id = ? AND user_id = ?
+    """, (wishlist_id, user_id))
+    if not cursor.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="Wishlist not found")
+
+    cursor.execute("""
+        SELECT
+            wi.id,
+            wi.wishlist_id,
+            wi.destination_id,
+            wi.notes,
+            wi.priority,
+            wi.created_at,
+            d.id as destination_inner_id,
+            d.name,
+            d.country,
+            d.continent,
+            d.type,
+            d.best_season,
+            d.avg_cost_usd,
+            d.rating,
+            d.annual_visitors_m,
+            d.unesco
+        FROM wishlist_items wi
+        JOIN destinations d ON wi.destination_id = d.id
+        WHERE wi.wishlist_id = ? AND wi.id = ?
+    """, (wishlist_id, item_id))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Wishlist item not found")
+
+    return dict(row)
+
+
+@app.patch("/wishlists/{wishlist_id}/items/{item_id}")
 def update_wishlist_item(
     wishlist_id: int,
     item_id: int,
-    payload: WishlistItemUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    payload: WishlistItemUpdateRequest,
+    authorization: Optional[str] = Header(default=None)
 ):
-    _get_owned_wishlist(db, wishlist_id, current_user.id)
+    user_id = get_user_id_from_auth(authorization)
 
-    item = (
-        db.query(WishlistItem)
-        .filter(WishlistItem.id == item_id, WishlistItem.wishlist_id == wishlist_id)
-        .first()
-    )
-    if not item:
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id FROM wishlists
+        WHERE id = ? AND user_id = ?
+    """, (wishlist_id, user_id))
+    if not cursor.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="Wishlist not found")
+
+    cursor.execute("""
+        SELECT notes, priority
+        FROM wishlist_items
+        WHERE wishlist_id = ? AND id = ?
+    """, (wishlist_id, item_id))
+    current = cursor.fetchone()
+
+    if not current:
+        conn.close()
         raise HTTPException(status_code=404, detail="Wishlist item not found")
 
-    if payload.notes is not None:
-        item.notes = payload.notes.strip() if payload.notes else None
-    if payload.priority is not None:
-        item.priority = payload.priority
+    new_notes = payload.notes if payload.notes is not None else current["notes"]
+    new_priority = payload.priority if payload.priority is not None else current["priority"]
 
-    db.commit()
-    db.refresh(item)
-    return item
+    cursor.execute("""
+        UPDATE wishlist_items
+        SET notes = ?, priority = ?
+        WHERE wishlist_id = ? AND id = ?
+    """, (new_notes, new_priority, wishlist_id, item_id))
+    conn.commit()
+
+    cursor.execute("""
+        SELECT
+            wi.id,
+            wi.wishlist_id,
+            wi.destination_id,
+            wi.notes,
+            wi.priority,
+            wi.created_at,
+            d.id as destination_inner_id,
+            d.name,
+            d.country,
+            d.continent,
+            d.type,
+            d.best_season,
+            d.avg_cost_usd,
+            d.rating,
+            d.annual_visitors_m,
+            d.unesco
+        FROM wishlist_items wi
+        JOIN destinations d ON wi.destination_id = d.id
+        WHERE wi.wishlist_id = ? AND wi.id = ?
+    """, (wishlist_id, item_id))
+    updated = dict(cursor.fetchone())
+    conn.close()
+
+    return updated
 
 
 @app.delete("/wishlists/{wishlist_id}/items/{item_id}")
 def delete_wishlist_item(
     wishlist_id: int,
     item_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    authorization: Optional[str] = Header(default=None)
 ):
-    _get_owned_wishlist(db, wishlist_id, current_user.id)
+    user_id = get_user_id_from_auth(authorization)
 
-    item = (
-        db.query(WishlistItem)
-        .filter(WishlistItem.id == item_id, WishlistItem.wishlist_id == wishlist_id)
-        .first()
-    )
-    if not item:
-        raise HTTPException(status_code=404, detail="Wishlist item not found")
+    conn = get_connection()
+    cursor = conn.cursor()
 
-    db.delete(item)
-    db.commit()
-    return {"message": "Wishlist item deleted"}
+    cursor.execute("""
+        SELECT id FROM wishlists
+        WHERE id = ? AND user_id = ?
+    """, (wishlist_id, user_id))
+    if not cursor.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="Wishlist not found")
+
+    cursor.execute("""
+        DELETE FROM wishlist_items
+        WHERE wishlist_id = ? AND id = ?
+    """, (wishlist_id, item_id))
+    conn.commit()
+    conn.close()
+
+    return {"message": "Wishlist item deleted successfully"}
