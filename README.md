@@ -408,6 +408,132 @@ This interface allows interactive testing of all endpoints.
 
 ---
 
+
+# Model Context Protocol (MCP) Integration
+
+The project also includes a Model Context Protocol (MCP) server which allows AI systems to interact with the Travel Without Barriers API.
+
+MCP enables large language models and other AI clients to call structured tools that interact with real services. In this project, the MCP server exposes selected backend functionality as AI-accessible tools.
+
+Importantly, the MCP server does not maintain a separate local database as its source of truth. Instead, it sends HTTP requests to the deployed FastAPI backend. This means MCP interactions affect the same live system used by the frontend web application.
+
+This ensures that:
+
+- MCP interactions affect the live deployed database  
+- the frontend and AI interfaces share the same backend  
+- wishlists created via MCP appear in the web application  
+- recommendations retrieved via MCP use the same scoring logic as the website  
+
+## MCP Architecture
+
+The MCP server works as a thin wrapper around the deployed API.
+
+The process works as follows:
+
+1. An AI client sends a tool request to the MCP server.  
+2. The MCP server translates the request into an HTTP request.  
+3. The request is sent to the deployed FastAPI backend.  
+4. The backend returns a response.  
+5. The MCP server returns that response to the AI system.
+
+Because the MCP server calls the deployed API rather than a local database, the backend remains the single source of truth for the system.
+
+## MCP Tools
+
+The MCP server exposes several tools that mirror the backend API functionality.
+
+Examples include:
+
+- retrieve destination recommendations  
+- register users  
+- login users  
+- list wishlists  
+- create wishlists  
+- delete wishlists  
+
+Each MCP tool internally calls the corresponding REST API endpoint.
+
+## Running the MCP Server Locally
+
+To start the MCP server locally:
+
+    python mcp_server.py
+
+This starts the MCP service so that an MCP client can connect to it.
+
+## Testing the MCP Server
+
+The MCP server can be tested using the MCP Inspector.
+
+### Step 1 — Navigate to the project directory
+
+    cd web_services_coursework
+
+### Step 2 — Start the MCP Inspector
+
+Run the following command:
+
+    npx -y @modelcontextprotocol/inspector python mcp_server.py
+
+This launches the MCP Inspector and opens a local interface in your browser.
+
+### Step 3 — View available MCP tools
+
+Inside the Inspector, open the **Tools** panel.
+
+You should see tools such as:
+
+- get_recommendations  
+- register_user  
+- login_user  
+- list_wishlists  
+- create_wishlist  
+- delete_wishlist  
+
+### Step 4 — Test the recommendation system
+
+Run the recommendation tool using example parameters such as:
+
+- continent: Europe  
+- sort_by: affordability  
+
+The MCP server will return recommendations from the deployed API.
+
+### Step 5 — Test wishlist creation
+
+Use the create_wishlist tool with valid user credentials.
+
+Example inputs:
+
+- email: your registered email  
+- password: your password  
+- name: MCP Test Wishlist  
+- description: Created via MCP  
+
+### Step 6 — Verify the frontend updates
+
+After creating a wishlist via MCP:
+
+1. open the deployed frontend application  
+2. log in using the same account  
+3. navigate to the wishlists page  
+
+If the wishlist appears on the website, this confirms that the MCP server is correctly interacting with the deployed backend.
+
+## Why MCP Was Included
+
+MCP was implemented to demonstrate a creative application of generative AI within the project.
+
+It allows AI systems to:
+
+- query the recommendation system  
+- create and manage wishlists  
+- interact with the travel planning service programmatically  
+
+This extends the project beyond a traditional REST API by enabling AI-driven interaction with the deployed system.
+
+---
+
 # Generative AI Usage
 
 Generative AI tools were used during development to assist with:
