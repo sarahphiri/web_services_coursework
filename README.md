@@ -18,13 +18,13 @@ This project was developed for the **COMP3011 Web Services and Web Data coursewo
 # Live Deployment
 
 Frontend (Web Application)  
-https://travel-without-barriers.vercel.app
+https://web-services-coursework.vercel.app
 
 Backend API  
-https://travel-without-barriers-production.up.railway.app
+https://webservicescoursework-production.up.railway.app
 
 Interactive API Documentation  
-https://travel-without-barriers-production.up.railway.app/docs
+https://webservicescoursework-production.up.railway.app/docs
 
 ---
 
@@ -408,6 +408,61 @@ This interface allows interactive testing of all endpoints.
 
 ---
 
+## Using the Deployed Application
+
+The easiest way to use the system is through the live deployment.
+
+### Web Application
+
+Open the deployed frontend:
+
+https://web-services-coursework.vercel.app
+
+From the website you can:
+
+- browse recommended travel destinations
+- filter destinations by accessibility metrics
+- register a user account
+- log in to the system
+- create and manage wishlists
+- add destinations to wishlists
+
+The frontend communicates with the deployed backend API hosted on Railway.
+
+### Backend API
+
+The backend REST API is available at:
+
+https://webservicescoursework-production.up.railway.app
+
+Interactive API documentation is available through FastAPI Swagger:
+
+https://webservicescoursework-production.up.railway.app/docs
+
+The documentation interface allows endpoints to be tested directly in the browser.
+
+### Example API Request
+
+You can retrieve destination recommendations by opening:
+
+https://webservicescoursework-production.up.railway.app/recommendations
+
+This will return recommended destinations in JSON format.
+
+### Testing Authentication
+
+User accounts can be created through the frontend interface, or by using the API documentation.
+
+For example, in the Swagger interface:
+
+1. open `/docs`
+2. select `POST /auth/register`
+3. provide an email and password
+4. execute the request
+
+Once registered, users can log in and manage wishlists through the frontend interface.
+
+---
 
 # Model Context Protocol (MCP) Integration
 
