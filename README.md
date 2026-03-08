@@ -1,144 +1,221 @@
-# web_services_coursework
+# Travel Without Barriers
 
-# Travel Without Barriers API
+Travel Without Barriers is a full-stack travel recommendation platform designed to help people who face financial or mental health barriers to travel discover destinations that are easier and less stressful to plan.
 
-## Project Overview
-
-Travel Without Barriers is a RESTful backend API designed to help people who face **financial or mental health barriers to travel** discover destinations that are easier and less stressful to plan.
-
-Many people want to travel but feel overwhelmed by factors such as:
-
-- high travel costs
-- overcrowded tourist destinations
-- difficulty planning trips
-
-This API reduces those barriers by recommending destinations based on:
+The system recommends destinations based on:
 
 - affordability
 - crowd levels
 - destination ratings
+- overall accessibility
 
-The system integrates a **tourism dataset of approximately 2000 global destinations** and computes recommendation metrics to identify destinations that minimise common travel barriers.
+Users can also create personal wishlists of destinations they want to visit.
 
-Users can also create **personal wishlists of destinations** they are interested in visiting.
+This project was developed for the **COMP3011 Web Services and Web Data coursework** at the **University of Leeds**.
 
-This project was developed for the **COMP3011 Web Services and Web Data coursework**, which requires students to design and implement a **data-driven API with database integration and CRUD functionality**.
+---
+
+# Live Deployment
+
+Frontend (Web Application)  
+https://travel-without-barriers.vercel.app
+
+Backend API  
+https://travel-without-barriers-production.up.railway.app
+
+Interactive API Documentation  
+https://travel-without-barriers-production.up.railway.app/docs
+
+---
+
+# GitHub Repository
+
+https://github.com/sarahphiri/web_services_coursework
+
+---
+
+# Project Overview
+
+Many people want to travel but feel overwhelmed by:
+
+- high travel costs
+- overcrowded tourist destinations
+- complex travel planning
+- uncertainty about where to start
+
+Travel Without Barriers reduces these obstacles by recommending destinations that are:
+
+- cheaper
+- less crowded
+- highly rated
+- easier to plan
+
+The backend API processes tourism data and computes recommendation metrics that help users discover accessible travel options.
 
 ---
 
 # Key Features
 
-- RESTful API built using **FastAPI**
-- Integration of a tourism dataset stored in **SQLite**
-- Recommendation scoring system including:
-  - affordability score
-  - quietness score
-  - barrier-friendly recommendation score
-- **CRUD functionality for wishlists**
-- **JWT authentication** for user accounts
-- **Pagination support** for large datasets
-- **Error handling and validation**
-- **Automated testing using pytest**
-- Interactive API documentation using **Swagger UI**
+## Destination Recommendation System
+
+Destinations are ranked using calculated metrics including:
+
+- Affordability Score
+- Quietness Score
+- Quality Score
+- Hidden Gem Score
+- Barrier Score
+
+These metrics help identify destinations that minimise common travel barriers.
+
+---
+
+## User Authentication
+
+Users can create accounts and log in securely.
+
+Authentication allows users to:
+
+- create wishlists
+- save destinations
+- manage their travel plans
+
+---
+
+## Wishlist Management
+
+The system supports full CRUD operations for wishlists.
+
+Users can:
+
+- create wishlists
+- add destinations to a wishlist
+- remove destinations
+- delete wishlists
+
+---
+
+## Destination Filtering
+
+Destinations can be filtered by:
+
+- continent
+- country
+- affordability score
+- quietness score
+- hidden gem score
+
+This allows users to explore destinations that match their preferences.
 
 ---
 
 # Technology Stack
 
-| Technology | Purpose |
-|---|---|
-| Python | Backend programming language |
-| FastAPI | REST API framework |
-| SQLite | Relational database |
-| SQLAlchemy | ORM for database access |
-| Pandas | Dataset import and preprocessing |
-| JWT | Authentication |
-| Pytest | Automated testing |
+## Backend
+
+- Python
+- FastAPI
+- SQLite
+- SQLAlchemy
+- Uvicorn
+
+FastAPI was chosen because it provides:
+
+- automatic API documentation
+- request validation using Pydantic
+- high performance
+- clean REST API design
 
 ---
 
-# Design Decisions
+## Frontend
 
-## FastAPI
+- Next.js
+- React
+- Tailwind CSS
 
-FastAPI was selected because it provides:
-
-- automatic OpenAPI documentation
-- strong type validation using Pydantic
-- high performance compared to traditional frameworks
-- easy integration with SQLAlchemy
-
-These features make it well suited to building modern REST APIs.
-
-## SQLite
-
-SQLite was selected because:
-
-- it is lightweight
-- requires no external database server
-- works well for development and coursework environments
-
-This allowed the API to remain easy to run locally.
-
-## SQLAlchemy
-
-SQLAlchemy was used as an ORM to:
-
-- simplify database interaction
-- support clear data models
-- enable maintainable database queries
-
-## Dataset Integration
-
-The tourism dataset was imported using **Pandas** through a dedicated import script. This approach allowed:
-
-- efficient dataset preprocessing
-- validation and cleaning of rows
-- automated database insertion
+Next.js enables rapid UI development and integrates easily with Vercel deployment.
 
 ---
 
-# System Architecture
+## Deployment
 
-The system follows a layered architecture separating API endpoints, business logic, and database access.
-
-Client  
-↓  
-FastAPI Endpoints  
-↓  
-Authentication Layer (JWT)  
-↓  
-Recommendation Engine  
-↓  
-SQLAlchemy ORM  
-↓  
-SQLite Database  
-
-This design improves:
-
-- modularity
-- maintainability
-- testability
+- Frontend: Vercel
+- Backend: Railway
 
 ---
 
 # Dataset
 
-The API uses a tourism dataset containing approximately **2000 global destinations**.
+Dataset Source:  
+https://www.kaggle.com/datasets/cosmox23/popular-tourist-destinations-and-their-features
 
-Each record contains:
+The dataset contains approximately **2000 global tourist destinations** and includes:
 
 - destination name
 - country
 - continent
 - destination type
-- estimated travel cost
+- estimated cost
 - visitor rating
 - annual visitor numbers
-- best season
-- UNESCO heritage indicator
+- best season to visit
 
-The dataset is imported into the database using a **Python import script built with Pandas**.
+These attributes allow the API to compute recommendation metrics.
+
+---
+
+# Recommendation Metrics
+
+## Affordability Score
+
+Lower travel costs produce higher scores.
+
+```
+Affordability Score = 1000 / (avg_cost_usd + 1)
+```
+
+---
+
+## Quietness Score
+
+Destinations with fewer visitors receive higher scores.
+
+```
+Quietness Score = 10 / (annual_visitors_m + 1)
+```
+
+---
+
+## Quality Score
+
+Represents the destination rating directly.
+
+```
+Quality Score = rating
+```
+
+---
+
+## Hidden Gem Score
+
+Combines high quality with low visitor numbers.
+
+```
+Hidden Gem Score = rating + Quietness Score
+```
+
+---
+
+## Barrier Score (Overall Recommendation)
+
+Combines affordability, quietness, and quality.
+
+```
+Barrier Score = Affordability Score + Quietness Score + Quality Score
+```
+
+Destinations with the highest barrier scores are recommended first.
 
 ---
 
@@ -146,392 +223,248 @@ The dataset is imported into the database using a **Python import script built w
 
 ## Destinations
 
-Stores tourism data.
+Stores imported tourism dataset.
 
-| Field | Description |
-|---|---|
-| id | primary key |
-| name | destination name |
-| country | country |
-| continent | continent |
-| type | destination type |
-| best_season | recommended travel season |
-| avg_cost_usd | estimated travel cost |
-| rating | visitor rating |
-| annual_visitors_m | number of annual visitors |
-| unesco | UNESCO heritage indicator |
+Fields include:
+
+- id
+- name
+- country
+- continent
+- type
+- best_season
+- avg_cost_usd
+- rating
+- annual_visitors_m
+- unesco
 
 ---
 
 ## Users
 
-| Field | Description |
-|---|---|
-| id | primary key |
-| email | user email |
-| password_hash | hashed password |
+Stores registered users.
+
+Fields include:
+
+- id
+- email
+- password
 
 ---
 
 ## Wishlists
 
-| Field | Description |
-|---|---|
-| id | primary key |
-| name | wishlist name |
-| description | wishlist description |
-| user_id | associated user |
+Stores user-created wishlists.
+
+Fields include:
+
+- id
+- user_id
+- name
+- description
+- created_at
 
 ---
 
 ## Wishlist Items
 
-| Field | Description |
-|---|---|
-| id | primary key |
-| wishlist_id | associated wishlist |
-| destination_id | saved destination |
-| notes | optional notes |
+Stores destinations saved to wishlists.
+
+Fields include:
+
+- id
+- wishlist_id
+- destination_id
+- notes
+- priority
+- created_at
 
 ---
 
-# Recommendation Scoring
+# Local Setup Guide
 
-The recommendation engine evaluates destinations using metrics designed to reduce travel barriers.
-
-## Affordability Score
-
-Measures how inexpensive a destination is relative to others.
-
-## Quietness Score
-
-Measures crowd levels based on annual visitor numbers.
-
-## Quality Score
-
-Based on destination ratings.
-
-## Barrier-Friendly Recommendation Score
-
-A weighted combination of affordability, quietness, and quality metrics used to rank recommended destinations.
+These instructions allow the project to be run locally.
 
 ---
 
-# API Endpoints
+## 1 Clone the repository
 
-## Destinations
-
-GET /destinations  
-Retrieve destinations with pagination.
-
-GET /destinations/{id}  
-Retrieve destination by ID.
-
-GET /destinations/count  
-Get total number of destinations.
-
-Example request:
-
-GET /destinations?limit=20&offset=0
-
-Example response:
-
-[
-  {
-    "id": 41,
-    "name": "Serene Temple",
-    "country": "Morocco",
-    "continent": "Africa",
-    "avg_cost_usd": 174.84,
-    "rating": 4.5
-  }
-]
-
----
-
-## Authentication
-
-POST /auth/register  
-Register a user.
-
-POST /auth/login  
-Authenticate and return JWT token.
-
----
-
-## Wishlists
-
-POST /wishlists  
-Create wishlist.
-
-GET /wishlists  
-Retrieve wishlists.
-
-GET /wishlists/{id}  
-Retrieve specific wishlist.
-
-POST /wishlists/{id}/items  
-Add destination to wishlist.
-
-DELETE /wishlists/{id}/items/{item_id}  
-Remove destination.
-
----
-
-# Installation
-
-Clone the repository:
-
-git clone https://github.com/username/travel-without-barriers-api.git  
-cd travel-without-barriers-api
-
-Create a virtual environment:
-
-python -m venv .venv  
-source .venv/bin/activate
-
-Install dependencies:
-
-pip install -r requirements.txt
-
----
-
-# Import Dataset
-
-Import tourism dataset into the database:
-
-python scripts/import_destinations.py
-
-The script loads the dataset using Pandas, performs cleaning, and inserts records into the destinations table.
-
----
-
-# Running the API
-
-Start the server:
-
-uvicorn app.main:app --reload
-
-API available at:
-
-http://127.0.0.1:8000
-
-Interactive documentation:
-
-http://127.0.0.1:8000/docs
-
----
-
-# Testing Strategy
-
-Automated tests are implemented using **pytest**.
-
-Tests include:
-
-- validation of scoring functions
-- API endpoint behaviour
-- authentication workflow
-- wishlist CRUD operations
-
-Tests can be executed using:
-
-pytest -q
-
-Testing ensures the reliability of both the recommendation logic and API endpoints.
-
----
-
-# Quick Start (Step-by-Step)
-
-Follow these steps to run the API locally.
-
-### 1. Clone the repository
-
-git clone https://github.com/sarahphiri/web_services_coursework.git  
+```bash
+git clone https://github.com/sarahphiri/web_services_coursework.git
 cd web_services_coursework
+```
 
-### 2. Create a virtual environment
+---
 
+## 2 Create a virtual environment
+
+```bash
 python -m venv .venv
+```
 
-Activate the environment:
+Activate the environment.
 
-Mac/Linux
+Mac / Linux
 
+```bash
 source .venv/bin/activate
+```
 
 Windows
 
+```bash
 .venv\Scripts\activate
+```
 
-### 3. Install dependencies
+---
 
+## 3 Install dependencies
+
+```bash
 pip install -r requirements.txt
+```
 
-### 4. Import the dataset
+---
 
-Before running the API, populate the database with the tourism dataset.
+## 4 Import the dataset
 
-python scripts/import_destinations.py
+Navigate to the scripts directory.
 
-This script will:
+```bash
+cd scripts
+```
 
-- load the dataset using Pandas
-- perform basic data cleaning
-- create the SQLite database if it does not exist
-- insert the destination records into the `destinations` table
+Run the import script.
 
-### 5. Start the API server
+```bash
+python import_destinations.py
+```
 
+This will populate the SQLite database (`travel.db`) with the tourism dataset.
+
+---
+
+## 5 Start the FastAPI backend
+
+From the project root run:
+
+```bash
 uvicorn app.main:app --reload
+```
 
-The API will start locally at:
+The API will run at:
 
+```
 http://127.0.0.1:8000
+```
 
-### 6. Open the API documentation
+API documentation:
 
-FastAPI automatically generates interactive documentation.
-
-Swagger UI:
-
+```
 http://127.0.0.1:8000/docs
-
-ReDoc:
-
-http://127.0.0.1:8000/redoc
-
-# Using the API
-
-Once the server is running, you can interact with the API using:
-
-- Swagger UI (recommended)
-- Postman
-- curl
-- any HTTP client
-
-### Example workflow
-
-1) Retrieve available destinations
-
-GET /destinations
-
-Example:
-
-GET http://127.0.0.1:8000/destinations?limit=20&offset=0
-
-This returns a paginated list of travel destinations.
+```
 
 ---
 
-2) Register a user account
+## 6 Run the frontend
 
-POST /auth/register
+Navigate to the frontend directory.
 
-Example request body:
+```bash
+cd travel-without-barriers-frontend
+```
 
-{
-  "email": "user@example.com",
-  "password": "securepassword"
-}
+Install dependencies.
 
----
+```bash
+npm install
+```
 
-3) Log in to obtain a JWT token
+Start the development server.
 
-POST /auth/login
+```bash
+npm run dev
+```
 
-Response:
+The frontend will run at:
 
-{
-  "access_token": "...",
-  "token_type": "bearer"
-}
-
----
-
-4) Create a wishlist
-
-POST /wishlists
-
-Authenticated users can create wishlists to store destinations they are interested in.
+```
+http://localhost:3000
+```
 
 ---
 
-5) Add destinations to a wishlist
+# Testing the API
 
-POST /wishlists/{id}/items
+The easiest way to test the API is using the built-in FastAPI documentation.
 
-This allows users to save recommended destinations for future trips.
+Open:
 
----
+```
+http://127.0.0.1:8000/docs
+```
 
-This workflow demonstrates how the API can be used to discover destinations and organise travel plans.
-
-# Error Handling
-
-The API implements structured error handling to ensure robust behaviour.
-
-Examples include:
-
-- 400 Bad Request for invalid input
-- 401 Unauthorized for authentication failures
-- 404 Not Found for missing resources
-- 409 Conflict for duplicate entries
-
-Validation is implemented using FastAPI and Pydantic models.
-
----
-
-# Version Control
-
-The project uses **Git and GitHub for version control**.
-
-The repository includes:
-
-- consistent commit history
-- modular code organisation
-- documented setup instructions
-- reproducible project environment
+This interface allows interactive testing of all endpoints.
 
 ---
 
 # Generative AI Usage
 
-Generative AI tools were used during the development of this project to support:
+Generative AI tools were used during development to assist with:
 
-- architecture planning
-- debugging
-- generating dataset import scripts
-- refining documentation
-- exploring alternative implementation approaches
+- dataset discovery
+- recommendation metric design
+- database schema ideas
+- debugging implementation issues
+- documentation generation
+- prompt engineering
+- branding design
 
-AI assistance was used in a **methodologically structured way**, supporting productivity while ensuring that all design decisions and implementation details were fully understood and verified by the developer.
+Tools used:
 
-Conversation logs and usage details are included in the technical report as required by the coursework guidelines.
+- ChatGPT
+- Gemini (for logo and design guidance)
 
----
-
-# Future Improvements
-
-Potential future improvements include:
-
-- personalised travel recommendations
-- machine learning recommendation models
-- integration with external travel APIs
-- advanced filtering and search
-- deployment to a cloud hosting platform
+All generated code and suggestions were reviewed and adapted before integration.
 
 ---
 
-# License
+# Licence
 
-MIT License
+Dataset released under the MIT License.
 
-EOF
+Copyright (c) 2013 Mark Otto  
+Copyright (c) 2017 Andrew Fong  
 
-## API Documentation
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files to deal in the Software without restriction.
 
-Full API documentation is available here:
+The software is provided **"as is"**, without warranty of any kind.
 
-[API Documentation PDF](Travel_Without_Barriers_API_Documentation.pdf)
+---
+
+---
+
+# API Documentation
+
+Full API documentation for the Travel Without Barriers backend can be found here:
+
+https://github.com/sarahphiri/web_services_coursework/blob/main/TWB_API_Documentation.pdf
+
+This document contains:
+
+- detailed descriptions of all API endpoints
+- authentication process and token usage
+- request parameters and example requests
+- example API responses
+- error handling and status codes
+- system architecture explanation
+
+The documentation provides a complete reference for developers who wish to interact with the API directly.
+
+---
+
+# Author
+
+Sarah Phiri  
+BSc Computer Science  
+University of Leeds
