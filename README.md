@@ -597,6 +597,7 @@ Generative AI tools were used during development to assist with:
 - recommendation metric design
 - database schema ideas
 - debugging implementation issues
+- code generation
 - documentation generation
 - prompt engineering
 - branding design
