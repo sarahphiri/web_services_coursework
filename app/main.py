@@ -4,6 +4,10 @@ from pydantic import BaseModel, field_validator
 import sqlite3
 import os
 from typing import Optional
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Depends
+
+security = HTTPBearer()
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATABASE = os.path.join(PROJECT_ROOT, "travel.db")
@@ -142,15 +146,16 @@ class WishlistItemUpdateRequest(BaseModel):
     priority: Optional[int] = None
 
 
-def get_user_id_from_auth(authorization: Optional[str]) -> int:
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Missing Authorization header")
+def get_user_id_from_auth(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> int:
+    token = credentials.credentials
 
-    if not authorization.startswith("Bearer demo-token-"):
+    if not token.startswith("demo-token-"):
         raise HTTPException(status_code=401, detail="Invalid token")
 
     try:
-        return int(authorization.replace("Bearer demo-token-", ""))
+        return int(token.replace("demo-token-", ""))
     except ValueError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
@@ -390,9 +395,7 @@ def get_recommendations(
 # =========================
 
 @app.get("/wishlists")
-def list_wishlists(authorization: Optional[str] = Header(default=None)):
-    user_id = get_user_id_from_auth(authorization)
-
+def get_wishlists(user_id: int = Depends(get_user_id_from_auth)):
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -400,20 +403,20 @@ def list_wishlists(authorization: Optional[str] = Header(default=None)):
         SELECT id, user_id, name, description, created_at
         FROM wishlists
         WHERE user_id = ?
-        ORDER BY created_at DESC, id DESC
+        ORDER BY created_at DESC
     """, (user_id,))
-    rows = [dict(row) for row in cursor.fetchall()]
-    conn.close()
 
-    return rows
+    wishlists = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return wishlists
 
 
 @app.post("/wishlists")
 def create_wishlist(
     payload: WishlistCreateRequest,
-    authorization: Optional[str] = Header(default=None)
+    user_id: int = Depends(get_user_id_from_auth)
 ):
-    user_id = get_user_id_from_auth(authorization)
+    #user_id = get_user_id_from_auth(authorization)
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -440,9 +443,9 @@ def create_wishlist(
 @app.get("/wishlists/{wishlist_id}")
 def get_wishlist(
     wishlist_id: int,
-    authorization: Optional[str] = Header(default=None)
+    user_id: int = Depends(get_user_id_from_auth)
 ):
-    user_id = get_user_id_from_auth(authorization)
+    #user_id = get_user_id_from_auth(authorization)
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -465,9 +468,9 @@ def get_wishlist(
 def update_wishlist(
     wishlist_id: int,
     payload: WishlistUpdateRequest,
-    authorization: Optional[str] = Header(default=None)
+    user_id: int = Depends(get_user_id_from_auth)
 ):
-    user_id = get_user_id_from_auth(authorization)
+    #user_id = get_user_id_from_auth(authorization)
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -509,9 +512,9 @@ def update_wishlist(
 @app.delete("/wishlists/{wishlist_id}")
 def delete_wishlist(
     wishlist_id: int,
-    authorization: Optional[str] = Header(default=None)
+    user_id: int = Depends(get_user_id_from_auth)
 ):
-    user_id = get_user_id_from_auth(authorization)
+    #user_id = get_user_id_from_auth(authorization)
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -538,9 +541,9 @@ def delete_wishlist(
 def add_wishlist_item(
     wishlist_id: int,
     payload: WishlistItemCreateRequest,
-    authorization: Optional[str] = Header(default=None)
+    user_id: int = Depends(get_user_id_from_auth)
 ):
-    user_id = get_user_id_from_auth(authorization)
+    #user_id = get_user_id_from_auth(authorization)
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -605,9 +608,9 @@ def add_wishlist_item(
 @app.get("/wishlists/{wishlist_id}/items")
 def list_wishlist_items(
     wishlist_id: int,
-    authorization: Optional[str] = Header(default=None)
+    user_id: int = Depends(get_user_id_from_auth)
 ):
-    user_id = get_user_id_from_auth(authorization)
+    #user_id = get_user_id_from_auth(authorization)
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -653,9 +656,9 @@ def list_wishlist_items(
 def get_wishlist_item(
     wishlist_id: int,
     item_id: int,
-    authorization: Optional[str] = Header(default=None)
+    user_id: int = Depends(get_user_id_from_auth)
 ):
-    user_id = get_user_id_from_auth(authorization)
+    #user_id = get_user_id_from_auth(authorization)
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -704,9 +707,9 @@ def update_wishlist_item(
     wishlist_id: int,
     item_id: int,
     payload: WishlistItemUpdateRequest,
-    authorization: Optional[str] = Header(default=None)
+    user_id: int = Depends(get_user_id_from_auth)
 ):
-    user_id = get_user_id_from_auth(authorization)
+    #user_id = get_user_id_from_auth(authorization)
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -772,9 +775,9 @@ def update_wishlist_item(
 def delete_wishlist_item(
     wishlist_id: int,
     item_id: int,
-    authorization: Optional[str] = Header(default=None)
+    user_id: int = Depends(get_user_id_from_auth)
 ):
-    user_id = get_user_id_from_auth(authorization)
+    #user_id = get_user_id_from_auth(authorization)
 
     conn = get_connection()
     cursor = conn.cursor()
