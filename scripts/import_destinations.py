@@ -1,4 +1,3 @@
-# Import required libraries
 import sqlite3
 import os
 import csv
@@ -12,11 +11,36 @@ DATABASE = os.path.join(PROJECT_ROOT, "travel.db")
 CSV_FILE = os.path.join(PROJECT_ROOT, "data", "Tourist_Destinations.csv")
 
 # -----------------------------------------
+# Helper functions
+# -----------------------------------------
+
+def to_float(value):
+    if value is None:
+        return None
+
+    value = str(value).strip()
+
+    if value == "":
+        return None
+
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def to_unesco_flag(value):
+    if value is None:
+        return 0
+
+    value = str(value).strip().lower()
+    return 1 if value in {"yes", "true", "1"} else 0
+
+
+# -----------------------------------------
 # Connect to the SQLite database
 # -----------------------------------------
 
-# Create a connection to the SQLite database
-# If the database file does not exist yet, SQLite will create it
 conn = sqlite3.connect(DATABASE)
 cursor = conn.cursor()
 
@@ -43,33 +67,43 @@ CREATE TABLE IF NOT EXISTS destinations (
 # Clear existing data before importing
 # -----------------------------------------
 
-# Remove existing destination rows so re-running the script
-# recreates the dataset cleanly without duplicates
 cursor.execute("DELETE FROM destinations")
 
 # -----------------------------------------
 # Read CSV file and import rows
 # -----------------------------------------
 
-with open(CSV_FILE, "r", encoding="utf-8-sig") as f:
+inserted_count = 0
+skipped_missing_count = 0
+skipped_duplicate_count = 0
+
+seen_destinations = set()
+
+with open(CSV_FILE, "r", encoding="utf-8-sig", newline="") as f:
     reader = csv.DictReader(f)
 
-    inserted_count = 0
+    print("CSV headers found:", reader.fieldnames)
 
     for row in reader:
-        # Extract required fields and normalise whitespace
-        name = (row.get("name") or row.get("Name") or "").strip()
-        country = (row.get("country") or row.get("Country") or "").strip()
+        name = (row.get("Destination Name") or "").strip()
+        country = (row.get("Country") or "").strip()
+        destination_type = (row.get("Type") or "").strip()
 
-        # Skip rows missing required values
+        # Skip rows missing core required fields
         if not name or not country:
+            skipped_missing_count += 1
             continue
 
-        inserted_count += 1
+        # Skip duplicates based on the database uniqueness rule
+        unique_key = (name.lower(), country.lower(), destination_type.lower())
+        if unique_key in seen_destinations:
+            skipped_duplicate_count += 1
+            continue
+
+        seen_destinations.add(unique_key)
 
         cursor.execute("""
         INSERT INTO destinations (
-            id,
             name,
             country,
             continent,
@@ -80,19 +114,20 @@ with open(CSV_FILE, "r", encoding="utf-8-sig") as f:
             annual_visitors_m,
             unesco
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            inserted_count,
             name,
             country,
-            row.get("continent") or row.get("Continent"),
-            row.get("type") or row.get("Type"),
-            row.get("best_season") or row.get("Best_Season"),
-            float(row.get("avg_cost_usd") or row.get("Average_Cost_USD") or 0),
-            float(row.get("rating") or row.get("Rating") or 0),
-            float(row.get("annual_visitors_m") or row.get("Annual_Visitors_Millions") or 0),
-            1 if str(row.get("unesco") or row.get("UNESCO") or "0").lower() in ["1", "true", "yes"] else 0
+            (row.get("Continent") or "").strip() or None,
+            destination_type or None,
+            (row.get("Best Season") or "").strip() or None,
+            to_float(row.get("Avg Cost (USD/day)")),
+            to_float(row.get("Avg Rating")),
+            to_float(row.get("Annual Visitors (M)")),
+            to_unesco_flag(row.get("UNESCO Site"))
         ))
+
+        inserted_count += 1
 
 # -----------------------------------------
 # Save changes and close database
@@ -108,3 +143,5 @@ conn.close()
 print("Destinations successfully imported into:", DATABASE)
 print("CSV loaded from:", CSV_FILE)
 print("Rows imported:", inserted_count)
+print("Rows skipped (missing required fields):", skipped_missing_count)
+print("Rows skipped (duplicates):", skipped_duplicate_count)
