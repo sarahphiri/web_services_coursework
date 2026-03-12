@@ -1,11 +1,19 @@
+# HTTP client used to make requests from the MCP server to the deployed API
 import httpx
 from typing import Optional, List, Dict, Any
 from mcp.server.fastmcp import FastMCP
 
+# Base URL of the deployed FastAPI backend on Railway
+# All MCP tool requests will call this API rather than a local database
 API_BASE_URL = "https://webservicescoursework-production.up.railway.app"
 
+# Initialise the MCP server instance
+# The name identifies this MCP service
 mcp = FastMCP("travel-without-barriers")
 
+# -----------------------------------------
+# Helper function for error handling
+# -----------------------------------------
 
 def handle_error_response(response: httpx.Response) -> str:
     try:
@@ -14,6 +22,9 @@ def handle_error_response(response: httpx.Response) -> str:
     except Exception:
         return response.text or f"Request failed with status {response.status_code}"
 
+# -----------------------------------------
+# MCP Tool: Get Destination Recommendations
+# -----------------------------------------
 
 @mcp.tool()
 def get_recommendations(
@@ -44,6 +55,9 @@ def get_recommendations(
 
     return response.json()
 
+# -----------------------------------------
+# MCP Tool: Register User
+# -----------------------------------------
 
 @mcp.tool()
 def register_user(email: str, password: str) -> Dict[str, Any]:
@@ -64,6 +78,9 @@ def register_user(email: str, password: str) -> Dict[str, Any]:
 
     return response.json()
 
+# -----------------------------------------
+# MCP Tool: Login User
+# -----------------------------------------
 
 @mcp.tool()
 def login_user(email: str, password: str) -> Dict[str, Any]:
@@ -84,6 +101,9 @@ def login_user(email: str, password: str) -> Dict[str, Any]:
 
     return response.json()
 
+# -----------------------------------------
+# MCP Tool: List Wishlists
+# -----------------------------------------
 
 @mcp.tool()
 def list_wishlists(email: str, password: str) -> List[Dict[str, Any]]:
@@ -114,6 +134,9 @@ def list_wishlists(email: str, password: str) -> List[Dict[str, Any]]:
 
     return response.json()
 
+# -----------------------------------------
+# MCP Tool: Create Wishlist
+# -----------------------------------------
 
 @mcp.tool()
 def create_wishlist(
@@ -158,6 +181,9 @@ def create_wishlist(
 
     return response.json()
 
+# -----------------------------------------
+# MCP Tool: Delete Wishlist
+# -----------------------------------------
 
 @mcp.tool()
 def delete_wishlist(
@@ -192,6 +218,9 @@ def delete_wishlist(
 
     return response.json()
 
+# -----------------------------------------
+# MCP Prompt
+# -----------------------------------------
 
 @mcp.prompt()
 def plan_low_stress_trip() -> str:
@@ -201,6 +230,9 @@ def plan_low_stress_trip() -> str:
         "Use the available recommendation and wishlist tools before answering."
     )
 
+# -----------------------------------------
+# Run MCP Server
+# -----------------------------------------
 
 if __name__ == "__main__":
     mcp.run()

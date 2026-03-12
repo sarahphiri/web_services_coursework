@@ -24,7 +24,6 @@ app.add_middleware(
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "https://web-services-coursework.vercel.app",
-        "https://web-services-coursework-c0iva4ttb-sarahphiris-projects.vercel.app/",
     ],
     allow_credentials=True,
     allow_methods=["*"],
