@@ -18,7 +18,7 @@ This project was developed for the **COMP3011 Web Services and Web Data coursewo
 # Live Deployment
 
 Frontend (Web Application)  
-https://web-services-coursework.vercel.app
+https://web-services-coursework.vercel.app/
 
 Backend API  
 https://webservicescoursework-production.up.railway.app
@@ -89,6 +89,7 @@ The system supports full CRUD operations for wishlists.
 Users can:
 
 - create wishlists
+- view wishlists and recommendations
 - add destinations to a wishlist
 - update their wishlists
 - remove destinations from their wishlist
@@ -304,6 +305,14 @@ From the website you can:
 
 The frontend communicates with the deployed backend API hosted on Railway.
 
+### Testing CRUD / API Endpoints
+
+The easiest way to test the API endpoints is using FastAPI's Interactive API Documentation page:
+
+https://webservicescoursework-production.up.railway.app/docs
+
+**NOTE:** Please refer to the Authentication guide within this README when testing endpoints which require authentication.
+
 # Local Setup Guide
 
 These instructions allow the project to be run locally.
@@ -417,9 +426,9 @@ http://localhost:3000
 
 ---
 
-# Testing the API
+# Testing the API locally
 
-The easiest way to test the API is using the built-in FastAPI documentation.
+The easiest way to test the API locally is using the built-in FastAPI documentation.
 
 Open:
 
@@ -427,7 +436,7 @@ Open:
 http://127.0.0.1:8000/docs
 ```
 
-This interface allows interactive testing of all endpoints.
+This interface allows interactive testing of all endpoints locally.
 
 ---
 
@@ -712,13 +721,11 @@ The software is provided **"as is"**, without warranty of any kind.
 
 ---
 
----
-
 # API Documentation
 
 Full API documentation for the Travel Without Barriers backend can be found here:
 
-https://github.com/sarahphiri/web_services_coursework/blob/main/TWB_API_Documentation.pdf
+https://github.com/sarahphiri/web_services_coursework/blob/main/API_Documentation_TWB.pdf
 
 This document contains:
 

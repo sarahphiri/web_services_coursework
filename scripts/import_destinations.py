@@ -1,13 +1,28 @@
+# Import required libraries
 import sqlite3
 import os
 import csv
+
+# -----------------------------------------
+# Define project file paths
+# -----------------------------------------
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATABASE = os.path.join(PROJECT_ROOT, "travel.db")
 CSV_FILE = os.path.join(PROJECT_ROOT, "data", "Tourist_Destinations.csv")
 
+# -----------------------------------------
+# Connect to the SQLite database
+# -----------------------------------------
+
+# Create a connection to the SQLite database
+# If the database file does not exist yet, SQLite will create it
 conn = sqlite3.connect(DATABASE)
 cursor = conn.cursor()
+
+# -----------------------------------------
+# Create the destinations table if needed
+# -----------------------------------------
 
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS destinations (
@@ -24,6 +39,7 @@ CREATE TABLE IF NOT EXISTS destinations (
 )
 """)
 
+# This table stores the tourism dataset used by the recommendation system
 cursor.execute("DELETE FROM destinations")
 
 with open(CSV_FILE, "r", encoding="utf-8-sig") as f:
@@ -57,8 +73,16 @@ with open(CSV_FILE, "r", encoding="utf-8-sig") as f:
             1 if str(row.get("unesco") or row.get("UNESCO") or "0").lower() in ["1", "true", "yes"] else 0
         ))
 
+# -----------------------------------------
+# Save changes and close database
+# -----------------------------------------
+
 conn.commit()
 conn.close()
+
+# -----------------------------------------
+# Clear existing data before importing
+# -----------------------------------------
 
 print("Destinations successfully imported into:", DATABASE)
 print("CSV loaded from:", CSV_FILE)
