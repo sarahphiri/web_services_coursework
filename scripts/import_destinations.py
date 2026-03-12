@@ -39,13 +39,34 @@ CREATE TABLE IF NOT EXISTS destinations (
 )
 """)
 
-# This table stores the tourism dataset used by the recommendation system
+# -----------------------------------------
+# Clear existing data before importing
+# -----------------------------------------
+
+# Remove existing destination rows so re-running the script
+# recreates the dataset cleanly without duplicates
 cursor.execute("DELETE FROM destinations")
+
+# -----------------------------------------
+# Read CSV file and import rows
+# -----------------------------------------
 
 with open(CSV_FILE, "r", encoding="utf-8-sig") as f:
     reader = csv.DictReader(f)
 
-    for i, row in enumerate(reader, start=1):
+    inserted_count = 0
+
+    for row in reader:
+        # Extract required fields and normalise whitespace
+        name = (row.get("name") or row.get("Name") or "").strip()
+        country = (row.get("country") or row.get("Country") or "").strip()
+
+        # Skip rows missing required values
+        if not name or not country:
+            continue
+
+        inserted_count += 1
+
         cursor.execute("""
         INSERT INTO destinations (
             id,
@@ -61,9 +82,9 @@ with open(CSV_FILE, "r", encoding="utf-8-sig") as f:
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            i,
-            row.get("name") or row.get("Name"),
-            row.get("country") or row.get("Country"),
+            inserted_count,
+            name,
+            country,
             row.get("continent") or row.get("Continent"),
             row.get("type") or row.get("Type"),
             row.get("best_season") or row.get("Best_Season"),
@@ -81,8 +102,9 @@ conn.commit()
 conn.close()
 
 # -----------------------------------------
-# Clear existing data before importing
+# Output confirmation messages
 # -----------------------------------------
 
 print("Destinations successfully imported into:", DATABASE)
 print("CSV loaded from:", CSV_FILE)
+print("Rows imported:", inserted_count)
