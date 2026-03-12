@@ -90,7 +90,8 @@ Users can:
 
 - create wishlists
 - add destinations to a wishlist
-- remove destinations
+- update their wishlists
+- remove destinations from their wishlist
 - delete wishlists
 
 ---
@@ -116,7 +117,6 @@ This allows users to explore destinations that match their preferences.
 - Python
 - FastAPI
 - SQLite
-- SQLAlchemy
 - Uvicorn
 
 FastAPI was chosen because it provides:
@@ -221,6 +221,8 @@ Destinations with the highest barrier scores are recommended first.
 
 # Database Schema
 
+The application uses a relational SQLite database stored in `travel.db`. The schema was designed to support user authentication, travel destination data, and full CRUD functionality for wishlists and wishlist items.
+
 ## Destinations
 
 Stores imported tourism dataset.
@@ -280,6 +282,27 @@ Fields include:
 - created_at
 
 ---
+
+## Using the Deployed Application
+
+The easiest way to use the system is through the live deployment.
+
+### Web Application
+
+Open the deployed frontend:
+
+https://web-services-coursework.vercel.app
+
+From the website you can:
+
+- browse recommended travel destinations
+- filter destinations by accessibility metrics
+- register a user account
+- log in to the system
+- create and manage wishlists
+- add destinations to wishlists
+
+The frontend communicates with the deployed backend API hosted on Railway.
 
 # Local Setup Guide
 
@@ -358,7 +381,7 @@ The API will run at:
 http://127.0.0.1:8000
 ```
 
-API documentation:
+API documentation (useful for testing endpoints):
 
 ```
 http://127.0.0.1:8000/docs
@@ -408,26 +431,106 @@ This interface allows interactive testing of all endpoints.
 
 ---
 
-## Using the Deployed Application
+# Authentication Guide
 
-The easiest way to use the system is through the live deployment.
+Some API endpoints are public, while others require authentication.
 
-### Web Application
+## Public Endpoints
 
-Open the deployed frontend:
+These endpoints can be used without logging in:
 
-https://web-services-coursework.vercel.app
+- `POST /auth/register`
+- `POST /auth/login`
+- `GET /destinations`
+- `GET /destinations/count`
+- `GET /destinations/{destination_id}`
+- `GET /recommendations`
 
-From the website you can:
+## Protected Endpoints
 
-- browse recommended travel destinations
-- filter destinations by accessibility metrics
-- register a user account
-- log in to the system
-- create and manage wishlists
-- add destinations to wishlists
+These endpoints require authentication:
 
-The frontend communicates with the deployed backend API hosted on Railway.
+- `GET /wishlists`
+- `POST /wishlists`
+- `GET /wishlists/{wishlist_id}`
+- `PATCH /wishlists/{wishlist_id}`
+- `DELETE /wishlists/{wishlist_id}`
+- `POST /wishlists/{wishlist_id}/items`
+- `GET /wishlists/{wishlist_id}/items`
+- `GET /wishlists/{wishlist_id}/items/{item_id}`
+- `PATCH /wishlists/{wishlist_id}/items/{item_id}`
+- `DELETE /wishlists/{wishlist_id}/items/{item_id}`
+
+## How to Authenticate in Swagger
+
+If you are testing the API through Swagger (`/docs`), follow these steps exactly.
+
+### Step 1 — Register a user
+
+Open:
+
+`POST /auth/register`
+
+Example request body:
+
+```json
+{
+  "email": "john@example.com",
+  "password": "password123"
+}
+```
+
+Execute the request.
+
+### Step 2 — Log in
+
+Open:
+
+`POST /auth/login`
+
+Use the same credentials:
+
+```json
+{
+  "email": "john@example.com",
+  "password": "password123"
+}
+```
+
+Execute the request.
+
+The response will return a token in this format:
+
+```json
+{
+  "access_token": "demo-token-X",
+  "token_type": "bearer"
+}
+```
+
+### Step 3 — Authorise Swagger
+
+At the top of the Swagger page, click Authorize.
+
+Paste only the token value, for example:
+
+`demo-token-8`
+
+Then click Authorize and Close.
+
+### Step 4 — Test protected endpoints
+
+You can now test protected routes such as:
+
+`GET /wishlists`
+
+`POST /wishlists`
+
+`POST /wishlists/{wishlist_id}/items`
+
+`DELETE /wishlists/{wishlist_id}`
+
+If authentication has been set up correctly, these endpoints will return successful responses instead of 401 Unauthorized.
 
 ### Backend API
 
@@ -448,21 +551,6 @@ You can retrieve destination recommendations by opening:
 https://webservicescoursework-production.up.railway.app/recommendations
 
 This will return recommended destinations in JSON format.
-
-### Testing Authentication
-
-User accounts can be created through the frontend interface, or by using the API documentation.
-
-For example, in the Swagger interface:
-
-1. open `/docs`
-2. select `POST /auth/register`
-3. provide an email and password
-4. execute the request
-
-Once registered, users can log in and manage wishlists through the frontend interface.
-
----
 
 # Model Context Protocol (MCP) Integration
 
@@ -597,7 +685,7 @@ Generative AI tools were used during development to assist with:
 - recommendation metric design
 - database schema ideas
 - debugging implementation issues
-- code generation
+- code generation (including comments)
 - documentation generation
 - prompt engineering
 - branding design

@@ -1,6 +1,12 @@
+// Base URL for the backend API
+// If a deployment environment variable exists it will use that,
+// otherwise it defaults to the local development API.
+
 const API_BASE_URL =
     process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 
+// Helper function that generates HTTP headers for API requests
+// If a token is provided, it adds an Authorization header
 function getAuthHeaders(token?: string): HeadersInit {
     if (token) {
         return {
@@ -14,6 +20,8 @@ function getAuthHeaders(token?: string): HeadersInit {
     };
 }
 
+// Utility function used to safely parse API responses
+// Handles JSON parsing and error handling consistently
 async function parseResponse(res: Response) {
     const text = await res.text();
 
@@ -36,6 +44,11 @@ async function parseResponse(res: Response) {
     return data;
 }
 
+// =============================
+// AUTHENTICATION REQUESTS
+// =============================
+
+// Registers a new user account
 export async function registerUser(email: string, password: string) {
     const res = await fetch(`${API_BASE_URL}/auth/register`, {
         method: "POST",
@@ -46,6 +59,7 @@ export async function registerUser(email: string, password: string) {
     return parseResponse(res);
 }
 
+// Logs in an existing user and returns an authentication token
 export async function loginUser(email: string, password: string) {
     const res = await fetch(`${API_BASE_URL}/auth/login`, {
         method: "POST",
@@ -56,6 +70,11 @@ export async function loginUser(email: string, password: string) {
     return parseResponse(res);
 }
 
+// =============================
+// DESTINATION RECOMMENDATIONS
+// =============================
+
+// Retrieves recommended destinations with optional filters
 export async function getAllRecommendations(filters?: {
     continent?: string;
     country?: string;
@@ -87,6 +106,11 @@ export async function getAllRecommendations(filters?: {
     return parseResponse(res);
 }
 
+// =============================
+// WISHLIST MANAGEMENT
+// =============================
+
+// Retrieve all wishlists belonging to the authenticated user
 export async function getWishlists(token: string) {
     const res = await fetch(`${API_BASE_URL}/wishlists`, {
         method: "GET",
@@ -97,6 +121,7 @@ export async function getWishlists(token: string) {
     return parseResponse(res);
 }
 
+// Create a new wishlist
 export async function createWishlist(
     token: string,
     name: string,
@@ -111,6 +136,7 @@ export async function createWishlist(
     return parseResponse(res);
 }
 
+// Delete an existing wishlist
 export async function deleteWishlist(token: string, wishlistId: number) {
     const res = await fetch(`${API_BASE_URL}/wishlists/${wishlistId}`, {
         method: "DELETE",
@@ -120,6 +146,11 @@ export async function deleteWishlist(token: string, wishlistId: number) {
     return parseResponse(res);
 }
 
+// =============================
+// WISHLIST ITEMS
+// =============================
+
+// Retrieve destinations saved inside a specific wishlist
 export async function getWishlistItems(token: string, wishlistId: number) {
     const res = await fetch(`${API_BASE_URL}/wishlists/${wishlistId}/items`, {
         method: "GET",
@@ -130,6 +161,7 @@ export async function getWishlistItems(token: string, wishlistId: number) {
     return parseResponse(res);
 }
 
+// Add a destination to a wishlist
 export async function addDestinationToWishlist(
     token: string,
     wishlistId: number,
@@ -150,6 +182,7 @@ export async function addDestinationToWishlist(
     return parseResponse(res);
 }
 
+// Remove a destination from a wishlist
 export async function deleteWishlistItem(
     token: string,
     wishlistId: number,

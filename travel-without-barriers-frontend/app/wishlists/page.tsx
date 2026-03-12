@@ -38,6 +38,7 @@ type WishlistItem = {
     unesco?: boolean | null;
 };
 
+//adds a different emoji for each holiday type
 function getHolidayEmoji(type?: string | null) {
     if (!type) return "🌍";
 

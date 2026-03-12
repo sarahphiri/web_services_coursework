@@ -1,3 +1,5 @@
+# Import core FastAPI, CORS, Pydantic, SQLite, and HTTPBearer classes for building the API and handling errors
+
 from fastapi import FastAPI, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, field_validator
@@ -12,31 +14,35 @@ security = HTTPBearer()
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATABASE = os.path.join(PROJECT_ROOT, "travel.db")
 
+# Import core FastAPI classes for building the API and handling errors
 app = FastAPI()
 
+# Enable Cross-Origin Resource Sharing so frontend can call the API
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "https://web-services-coursework.vercel.app",
+        "https://web-services-coursework-c0iva4ttb-sarahphiris-projects.vercel.app/",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
+# Function to establish a connection to the SQLite database
 def get_connection():
     conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
     return conn
 
-
+# Function to initialise the database tables if they do not exist
 def init_db():
     conn = get_connection()
     cursor = conn.cursor()
 
+    # Destinations table stores the tourism dataset
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,6 +52,7 @@ def init_db():
         )
     """)
 
+    # Wishlists table stores user-created wishlists
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS destinations (
             id INTEGER PRIMARY KEY,
@@ -61,6 +68,7 @@ def init_db():
         )
     """)
 
+    # Wishlists table stores user-created wishlis
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS wishlists (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -72,6 +80,7 @@ def init_db():
         )
     """)
 
+    # Wishlist items store destinations saved within wishlists
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS wishlist_items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -88,7 +97,7 @@ def init_db():
     conn.commit()
     conn.close()
 
-
+# Run database initialization automatically when the API starts
 @app.on_event("startup")
 def startup():
     init_db()
@@ -98,6 +107,7 @@ class AuthRequest(BaseModel):
     email: str
     password: str
 
+    # Email validation to prevent blank inputs
     @field_validator("email")
     @classmethod
     def validate_email(cls, value: str) -> str:
@@ -106,6 +116,7 @@ class AuthRequest(BaseModel):
             raise ValueError("Email cannot be blank")
         return value
 
+    # Password validation with minimum length
     @field_validator("password")
     @classmethod
     def validate_password(cls, value: str) -> str:
@@ -116,7 +127,7 @@ class AuthRequest(BaseModel):
             raise ValueError("Password must be at least 6 characters long")
         return value
 
-
+# Request model for creating a wishlist
 class WishlistCreateRequest(BaseModel):
     name: str
     description: Optional[str] = None
@@ -129,46 +140,58 @@ class WishlistCreateRequest(BaseModel):
             raise ValueError("Wishlist name cannot be blank")
         return value
 
-
+# Model used for updating wishlist fields
 class WishlistUpdateRequest(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
 
-
+# Model used for updating wishlist fields
 class WishlistItemCreateRequest(BaseModel):
     destination_id: int
     notes: Optional[str] = None
     priority: Optional[int] = None
 
-
+# Model used when updating wishlist items
 class WishlistItemUpdateRequest(BaseModel):
     notes: Optional[str] = None
     priority: Optional[int] = None
 
+# =========================
+# AUTHENTICATION HELPER
+# =========================
 
+
+# Extract user ID from the Authorization header
 def get_user_id_from_auth(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> int:
     token = credentials.credentials
 
+    # Extract token value
     if not token.startswith("demo-token-"):
         raise HTTPException(status_code=401, detail="Invalid token")
 
     try:
+        # Convert token suffix into integer user ID
         return int(token.replace("demo-token-", ""))
     except ValueError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
+# =========================
+# ROOT ENDPOINT
+# =========================
+
+# Simple root endpoint to verify API is running
 @app.get("/")
 def root():
     return {"message": "FastAPI is running", "database": DATABASE}
 
-
 # =========================
-# AUTH
+# AUTHENTICATION ENDPOINTS
 # =========================
 
+# Register a new user
 @app.post("/auth/register")
 def register_user(payload: AuthRequest):
     email = payload.email.strip().lower()
@@ -186,6 +209,7 @@ def register_user(payload: AuthRequest):
             detail="An account with this email already exists."
         )
 
+    # Insert new user
     cursor.execute(
         "INSERT INTO users (email, password) VALUES (?, ?)",
         (email, password)
@@ -200,7 +224,7 @@ def register_user(payload: AuthRequest):
         "user_id": user_id
     }
 
-
+# Login endpoint returning authentication token
 @app.post("/auth/login")
 def login_user(payload: AuthRequest):
     email = payload.email.strip().lower()
@@ -216,9 +240,11 @@ def login_user(payload: AuthRequest):
     user = cursor.fetchone()
     conn.close()
 
+    # Reject invalid credentials
     if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
+    # Return demo authentication token
     return {
         "access_token": f"demo-token-{user['id']}",
         "token_type": "bearer",
@@ -233,6 +259,7 @@ def login_user(payload: AuthRequest):
 # DESTINATIONS
 # =========================
 
+# Retrieve list of destinations with pagination
 @app.get("/destinations")
 def get_destinations(
     limit: int = Query(default=100, ge=1),
@@ -253,7 +280,7 @@ def get_destinations(
     conn.close()
     return rows
 
-
+# Return total number of destinations
 @app.get("/destinations/count")
 def get_destinations_count():
     conn = get_connection()
@@ -265,7 +292,7 @@ def get_destinations_count():
 
     return {"count": count}
 
-
+# Retrieve a single destination by ID
 @app.get("/destinations/{destination_id}")
 def get_destination(destination_id: int):
     conn = get_connection()
@@ -291,6 +318,7 @@ def get_destination(destination_id: int):
 # RECOMMENDATIONS
 # =========================
 
+# Endpoint that returns recommended destinations based on filters and ranking metrics
 @app.get("/recommendations")
 def get_recommendations(
     continent: Optional[str] = Query(default=None),
@@ -394,6 +422,7 @@ def get_recommendations(
 # WISHLISTS
 # =========================
 
+# Endpoint that returns recommended destinations based on filters and ranking metrics
 @app.get("/wishlists")
 def get_wishlists(user_id: int = Depends(get_user_id_from_auth)):
     conn = get_connection()
@@ -411,12 +440,12 @@ def get_wishlists(user_id: int = Depends(get_user_id_from_auth)):
     return wishlists
 
 
+# Create a new wishlist for the authenticated user
 @app.post("/wishlists")
 def create_wishlist(
     payload: WishlistCreateRequest,
     user_id: int = Depends(get_user_id_from_auth)
 ):
-    #user_id = get_user_id_from_auth(authorization)
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -440,12 +469,12 @@ def create_wishlist(
     return row
 
 
+# Retrieve a specific wishlist
 @app.get("/wishlists/{wishlist_id}")
 def get_wishlist(
     wishlist_id: int,
     user_id: int = Depends(get_user_id_from_auth)
 ):
-    #user_id = get_user_id_from_auth(authorization)
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -464,13 +493,13 @@ def get_wishlist(
     return dict(row)
 
 
+# Update wishlist details
 @app.patch("/wishlists/{wishlist_id}")
 def update_wishlist(
     wishlist_id: int,
     payload: WishlistUpdateRequest,
     user_id: int = Depends(get_user_id_from_auth)
 ):
-    #user_id = get_user_id_from_auth(authorization)
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -514,7 +543,6 @@ def delete_wishlist(
     wishlist_id: int,
     user_id: int = Depends(get_user_id_from_auth)
 ):
-    #user_id = get_user_id_from_auth(authorization)
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -543,7 +571,6 @@ def add_wishlist_item(
     payload: WishlistItemCreateRequest,
     user_id: int = Depends(get_user_id_from_auth)
 ):
-    #user_id = get_user_id_from_auth(authorization)
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -610,7 +637,6 @@ def list_wishlist_items(
     wishlist_id: int,
     user_id: int = Depends(get_user_id_from_auth)
 ):
-    #user_id = get_user_id_from_auth(authorization)
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -658,7 +684,6 @@ def get_wishlist_item(
     item_id: int,
     user_id: int = Depends(get_user_id_from_auth)
 ):
-    #user_id = get_user_id_from_auth(authorization)
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -709,7 +734,6 @@ def update_wishlist_item(
     payload: WishlistItemUpdateRequest,
     user_id: int = Depends(get_user_id_from_auth)
 ):
-    #user_id = get_user_id_from_auth(authorization)
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -777,7 +801,6 @@ def delete_wishlist_item(
     item_id: int,
     user_id: int = Depends(get_user_id_from_auth)
 ):
-    #user_id = get_user_id_from_auth(authorization)
 
     conn = get_connection()
     cursor = conn.cursor()
