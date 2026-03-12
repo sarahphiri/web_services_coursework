@@ -298,7 +298,7 @@ The easiest way to test the API endpoints is using FastAPI's Interactive API Doc
 
 https://webservicescoursework-production.up.railway.app/docs
 
-Click on an endpoint, click 'Try it out', then execute. Some endpoints require suitable parameters (refer to API documentation) and authentication (refer to 'How to Authenticate in Swagger, as mentioned below). You should be able to view the server response and response body (JSON).
+Click on an endpoint, click 'Try it out', then execute. Some endpoints require suitable parameters (refer to API documentation) and authentication (refer to 'How to Authenticate in Swagger', as mentioned below). You should be able to view the server response and response body (JSON).
 
 **IMPORTANT: Please refer to the Authentication guide ('How to Authenticate in Swagger') within this README when testing endpoints, as several endpoints require authentication.**
 
