@@ -374,6 +374,12 @@ python import_destinations.py
 
 This will populate the SQLite database (`travel.db`) with the tourism dataset.
 
+Return back to the main directory.
+
+```bash
+cd ..
+```
+
 ---
 
 ## 5 Start the FastAPI backend
@@ -400,7 +406,7 @@ http://127.0.0.1:8000/docs
 
 ## 6 Run the frontend
 
-Navigate to the frontend directory.
+Navigate to the frontend directory (open a new terminal window while the backend is still running)
 
 ```bash
 cd travel-without-barriers-frontend
@@ -607,7 +613,9 @@ Each MCP tool internally calls the corresponding REST API endpoint.
 
 ## Running the MCP Server Locally
 
-To start the MCP server locally:
+This is **not required to run the API or test the coursework functionality**
+
+To start the MCP server locally (make sure dependencies are already installed, as mentioned in local setup:
 
     python mcp_server.py
 
@@ -623,7 +631,7 @@ The MCP server can be tested using the MCP Inspector.
 
 ### Step 2 — Start the MCP Inspector
 
-Run the following command:
+Run the following command (while the server is running locally, as shown above):
 
     npx -y @modelcontextprotocol/inspector python mcp_server.py
 
@@ -671,6 +679,14 @@ After creating a wishlist via MCP:
 3. navigate to the wishlists page  
 
 If the wishlist appears on the website, this confirms that the MCP server is correctly interacting with the deployed backend.
+
+### Troubleshooting
+
+If the MCP inspector reports that a port is already in use, a previous Node process may still be running.
+
+Run the following command to reset the MCP inspector environment:
+
+`pkill node`
 
 ## Why MCP Was Included
 
