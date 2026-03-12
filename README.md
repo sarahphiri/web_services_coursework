@@ -15,7 +15,7 @@ This project was developed for the **COMP3011 Web Services and Web Data coursewo
 
 ---
 
-# Live Deployment
+# Live Deployment (quick access to links)
 
 Frontend (Web Application)  
 https://web-services-coursework.vercel.app/
@@ -25,12 +25,6 @@ https://webservicescoursework-production.up.railway.app
 
 Interactive API Documentation  
 https://webservicescoursework-production.up.railway.app/docs
-
----
-
-# GitHub Repository
-
-https://github.com/sarahphiri/web_services_coursework
 
 ---
 
@@ -119,13 +113,6 @@ This allows users to explore destinations that match their preferences.
 - FastAPI
 - SQLite
 - Uvicorn
-
-FastAPI was chosen because it provides:
-
-- automatic API documentation
-- request validation using Pydantic
-- high performance
-- clean REST API design
 
 ---
 
@@ -311,11 +298,13 @@ The easiest way to test the API endpoints is using FastAPI's Interactive API Doc
 
 https://webservicescoursework-production.up.railway.app/docs
 
-**PLEASE NOTE BEFORE TESTING: Please refer to the Authentication guide ('How to Authenticate in Swagger') within this README when testing endpoints, as several endpoints require authentication.**
+Click on an endpoint, click 'Try it out', then execute. Some endpoints require suitable parameters (refer to API documentation) and authentication (refer to 'How to Authenticate in Swagger, as mentioned below). You should be able to view the server response and response body (JSON).
 
-# Local Setup Guide
+**IMPORTANT: Please refer to the Authentication guide ('How to Authenticate in Swagger') within this README when testing endpoints, as several endpoints require authentication.**
 
-These instructions allow the project to be run locally.
+# Local Setup Guide (Optional)
+
+These instructions allow the project to be run locally, which is optional, as this this API has been deployed.
 
 ---
 
@@ -567,21 +556,6 @@ https://webservicescoursework-production.up.railway.app/recommendations
 
 This will return recommended destinations in JSON format.
 
-# Model Context Protocol (MCP) Integration
-
-The project also includes a Model Context Protocol (MCP) server which allows AI systems to interact with the Travel Without Barriers API.
-
-MCP enables large language models and other AI clients to call structured tools that interact with real services. In this project, the MCP server exposes selected backend functionality as AI-accessible tools.
-
-Importantly, the MCP server does not maintain a separate local database as its source of truth. Instead, it sends HTTP requests to the deployed FastAPI backend. This means MCP interactions affect the same live system used by the frontend web application.
-
-This ensures that:
-
-- MCP interactions affect the live deployed database  
-- the frontend and AI interfaces share the same backend  
-- wishlists created via MCP appear in the web application  
-- recommendations retrieved via MCP use the same scoring logic as the website  
-
 ## MCP Architecture
 
 The MCP server works as a thin wrapper around the deployed API.
@@ -611,7 +585,7 @@ Examples include:
 
 Each MCP tool internally calls the corresponding REST API endpoint.
 
-## Running the MCP Server Locally
+## Running the MCP Server locally (Optional)
 
 This is **not required to run the API or test the coursework functionality**
 
@@ -637,9 +611,9 @@ Run the following command (while the server is running locally, as shown above):
 
 This launches the MCP Inspector and opens a local interface in your browser.
 
-### Step 3 — View available MCP tools
+### Step 3 — Click 'Connect" to view available MCP tools
 
-Inside the Inspector, open the **Tools** panel.
+Click the connect button. Then, inside the Inspector, open the **Tools** panel.
 
 You should see tools such as:
 
@@ -688,18 +662,6 @@ Run the following command to reset the MCP inspector environment:
 
 `pkill node`
 
-## Why MCP Was Included
-
-MCP was implemented to demonstrate a creative application of generative AI within the project.
-
-It allows AI systems to:
-
-- query the recommendation system  
-- create and manage wishlists  
-- interact with the travel planning service programmatically  
-
-This extends the project beyond a traditional REST API by enabling AI-driven interaction with the deployed system.
-
 ---
 
 # Generative AI Usage
@@ -710,7 +672,7 @@ Generative AI tools were used during development to assist with:
 - recommendation metric design
 - database schema ideas
 - debugging implementation issues
-- code generation (including comments)
+- code generation (including comments and creating this README)
 - documentation generation
 - prompt engineering
 - branding design
@@ -718,7 +680,7 @@ Generative AI tools were used during development to assist with:
 Tools used:
 
 - ChatGPT
-- Gemini (for logo and design guidance)
+- Gemini
 
 All generated code and suggestions were reviewed and adapted before integration.
 
@@ -742,15 +704,6 @@ The software is provided **"as is"**, without warranty of any kind.
 Full API documentation for the Travel Without Barriers backend can be found here:
 
 https://github.com/sarahphiri/web_services_coursework/blob/main/API_Documentation_TWB.pdf
-
-This document contains:
-
-- detailed descriptions of all API endpoints
-- authentication process and token usage
-- request parameters and example requests
-- example API responses
-- error handling and status codes
-- system architecture explanation
 
 The documentation provides a complete reference for developers who wish to interact with the API directly.
 
